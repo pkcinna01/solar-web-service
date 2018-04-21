@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.io.PrintWriter;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -78,6 +79,14 @@ public class EpeverService {
             }
         }
         metricSourceList.clear();
+    }
+
+
+    public void print(PrintWriter pw) throws EpeverException {
+        for( MetricsSource ms : metricSourceList ) {
+            ms.fields.readValues();
+            ms.fields.forEach( f -> pw.println(f.name + ": " + f.toString() ));
+        }
     }
 
 

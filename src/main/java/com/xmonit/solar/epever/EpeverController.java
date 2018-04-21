@@ -19,7 +19,7 @@ public class EpeverController {
     AppConfig appConfig;
 
     @Autowired
-    ArduinoService epeverService;
+    EpeverService epeverService;
 
 
     @RequestMapping("/help")
@@ -36,6 +36,24 @@ public class EpeverController {
         //new ArduinoAbout().printHelp(pw);
     }
 
+    @RequestMapping("/test")
+    public void test(Writer respWriter, HttpServletResponse resp) {
+
+        resp.setContentType("text/plain");
+        resp.setCharacterEncoding("UTF-8");
+
+        PrintWriter pw = new PrintWriter(respWriter);
+        pw.println("USB EPEver Charge Controller client");
+
+        try {
+            epeverService.print(pw);
+        } catch (EpeverException e) {
+            e.printStackTrace(pw);
+        }
+        pw.println();
+
+        //new ArduinoAbout().printHelp(pw);
+    }
 
     @RequestMapping("/")
     public void index(Writer respWriter, HttpServletResponse resp) {
