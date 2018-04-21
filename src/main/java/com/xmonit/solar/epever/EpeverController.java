@@ -11,7 +11,7 @@ import java.io.PrintWriter;
 import java.io.Writer;
 
 
-@RestController()
+@RestController("/epever")
 @Timed
 public class EpeverController {
 

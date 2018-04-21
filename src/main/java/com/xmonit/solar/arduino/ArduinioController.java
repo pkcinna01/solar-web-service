@@ -13,7 +13,7 @@ import java.io.PrintWriter;
 import java.io.Writer;
 
 
-@RestController()
+@RestController("/arduino")
 @Timed
 public class ArduinioController {
 

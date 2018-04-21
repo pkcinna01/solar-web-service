@@ -1,16 +1,20 @@
-# arduino-solar-client
+# solar-client
 
 ## Synopsis
 
-This application queries and updates an Arduino via USB.  The Arduino manages fans and temperatures.
+Application for Off Grid Solar System using EPEver Charge Controllers
+1) Queries and updates an Arduino via USB.  The Arduino manages fans and temperatures.
 It also monitors power usage and voltages.
+2) Queries and updates EPEver Charge Controllers via USB using modbus protocol.
 
-From a high level, it is a web interface for using the [arduino-solar-serialbus](https://github.com/pkcinna01/arduino-solar-serialbus)
-java jar file.
+From a high level, it is a web interface for using the 
+[arduino-solar-serialbus](https://github.com/pkcinna01/arduino-solar-serialbus)
+and
+[epever-solar-modbus](https://github.com/pkcinna01/epever-solar-modbus)
+java jar files.
 
 This is a Spring Boot web application that runs as a service on Linux on port 9202 by default.
-It listens for HTTP POST requests at the `/execute` end point.  It uses the Spring
-Actuator API to expose arduino data in Prometheus and Grafana.
+It uses the Spring Actuator API to expose arduino data in Prometheus and Grafana.
 
 
 **TO DO:**
@@ -25,12 +29,12 @@ Grafana, Java, Maven, Nginx, etc...
 [(see arduino-solar-serialbus for url syntax)](https://github.com/pkcinna01/arduino-solar-serialbus) 
 ```
 # Launch /opt/prometheus/bin/arduino-solar-client before running curl cmd 
-curl -X POST http://localhost:9202/execute
+curl -X POST http://localhost:9202/arduino/execute
 ```
 
 **View supported commands:**
 ```
-pkcinna@jax1:/opt/prometheus/bin$ curl -X POST http://localhost:9202/help
+pkcinna@jax1:/opt/prometheus/bin$ curl -X POST http://localhost:9202/arduino/help
 ```
 
 ## Motivation
