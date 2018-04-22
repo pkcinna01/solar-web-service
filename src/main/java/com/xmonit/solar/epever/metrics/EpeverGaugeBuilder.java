@@ -1,7 +1,6 @@
 package com.xmonit.solar.epever.metrics;
 
-import com.xmonit.solar.arduino.ArduinoSerialBus;
-import com.xmonit.solar.arduino.data.*;
+import com.xmonit.solar.epever.EpeverSolarCharger;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -20,17 +19,16 @@ import java.util.function.ToDoubleFunction;
 public class EpeverGaugeBuilder {
 
     MeterRegistry registry;
-    ArduinoSerialBus serialBus;
+    EpeverSolarCharger charger;
 
-
-    public EpeverGaugeBuilder(ArduinoSerialBus serialBus, MeterRegistry registry) {
-        this.serialBus = serialBus;
+    public EpeverGaugeBuilder(EpeverSolarCharger charger, MeterRegistry registry) {
         this.registry = registry;
+        this.charger = charger;
     }
 
     public <T> Gauge gauge(String name, T obj, ToDoubleFunction<T> f, List<Tag> tags) {
 
-        Gauge.Builder<T> b = Gauge.builder("arduino.solar." + name, obj, f)
+        Gauge.Builder<T> b = Gauge.builder("epever.solar." + name, obj, f)
                 .tags(getCommonTags());
 
         if (tags != null) {
@@ -46,11 +44,10 @@ public class EpeverGaugeBuilder {
     }
 
     protected List<Tag> getCommonTags() {
-        return Collections.singletonList(new ImmutableTag("commPort",
-                serialBus == null ? "" : serialBus.commPortName == null ? "" : serialBus.commPortName));
+        return Collections.singletonList(new ImmutableTag("commPort", charger.getSerialName()));
     }
 
-    void init(ArduinoGetResponse resp) {
+    /*void init(ArduinoGetResponse resp) {
 
         gauge("fanMode", resp, ArduinoGetResponse::getFanModeAsDouble);
         gauge("respCode", resp, ArduinoGetResponse::getRespCodeAsDouble);
@@ -89,5 +86,6 @@ public class EpeverGaugeBuilder {
                 gauge("tempSensor.heatIndex", tempSensor, TempSensor::getHeatIndexAsDouble, tags);
             }
         }
-    }
+    }*/
+
 }

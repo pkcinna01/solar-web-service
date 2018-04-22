@@ -10,6 +10,7 @@ import org.codehaus.jackson.node.ObjectNode;
 import org.junit.Before;
 import org.junit.Test;
 
+import static com.xmonit.solar.arduino.ArduinoSerialBus.NO_VALIDATION_REQ_ID;
 import static org.junit.Assert.*;
 
 
@@ -19,26 +20,37 @@ public class ArduinoServiceTest {
 
     MeterRegistry registry;
     ArduinoService serialBus;
+
     AppConfig appConfig;
+
     ArduinoGetResponseMetrics metricsRespHandler;
 
 
     @Before
     public void initAll() {
         appConfig = new AppConfig();
+        appConfig.cmd = "GET";
+        appConfig.baudRate=38400;
+        appConfig.commPortRegEx="ttyACM.*";
         registry = new SimpleMeterRegistry();
         metricsRespHandler = new ArduinoGetResponseMetrics(registry);
+
         serialBus = new ArduinoService(appConfig,metricsRespHandler);
-        serialBus.setCommPortName( "ttyACM999" );
+        //serialBus.setCommPortName( "ttyACM0" );
     }
 
+    @Test public void readUsbLiveData() throws Exception {
+
+        String resp = serialBus.execute("GET", null, NO_VALIDATION_REQ_ID);
+        System.out.println(resp);
+    }
 
     @Test
     public void checkRegistryValues() throws Exception {
 
         JsonNode respNode = mapper.readTree(MockData.JSON_GET_RESP_STR);
 
-        serialBus.processResponse(respNode);
+        //serialBus.processResponse(respNode);
 
         assertEquals(2,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
         assertEquals(61.16,registry.get("arduino.solar.tempSensor.temp").tag("device","Bench").tag("tempSensor","DHT").gauge().value(),0.0001);
@@ -53,13 +65,13 @@ public class ArduinoServiceTest {
 
         ObjectNode mutableNode = (ObjectNode) respNode;
         mutableNode.put("fanMode",1);
-        serialBus.processResponse(respNode);
+        //serialBus.processResponse(respNode);
         assertEquals(1,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
 
-        serialBus.processResponse(MockData.JSON_ERROR_RESP_STR);
+        //serialBus.processResponse(MockData.JSON_ERROR_RESP_STR);
         assertEquals(Double.NaN,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
 
-        serialBus.processResponse(respNode);
+        //serialBus.processResponse(respNode);
         assertEquals(1,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
     }
 

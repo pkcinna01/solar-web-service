@@ -1,9 +1,9 @@
 package com.xmonit.solar.epever.metrics;
 
-import com.xmonit.solar.arduino.ArduinoException;
-import com.xmonit.solar.arduino.ArduinoResponseProcessor;
-import com.xmonit.solar.arduino.ArduinoSerialBus;
-import com.xmonit.solar.arduino.data.ArduinoGetResponse;
+//import com.xmonit.solar.arduino.ArduinoException;
+//import com.xmonit.solar.arduino.ArduinoResponseProcessor;
+//import com.xmonit.solar.arduino.ArduinoSerialBus;
+//import com.xmonit.solar.arduino.data.ArduinoGetResponse;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import org.codehaus.jackson.JsonNode;
@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Exposes Arduino data read from USB as monitoring metrics (default is Prometheus)
  */
 @Component
-public class EpeverMetrics implements ArduinoResponseProcessor {
+public class EpeverMetrics { //implements ArduinoResponseProcessor {
 
     public class UpdateStatsTracker {
         AtomicInteger cnt = new AtomicInteger();
@@ -63,7 +63,7 @@ public class EpeverMetrics implements ArduinoResponseProcessor {
     private static final Logger logger = LoggerFactory.getLogger(EpeverMetrics.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    protected ArduinoGetResponse data;
+    //protected ArduinoGetResponse data;
     private MeterRegistry registry;
     private AtomicInteger serialReadErrorCnt = new AtomicInteger();
     private AtomicInteger serialReadOk = new AtomicInteger();
@@ -74,7 +74,7 @@ public class EpeverMetrics implements ArduinoResponseProcessor {
         this.registry = registry;
     }
 
-
+/*
     public ArduinoGetResponse getLatestResponse() throws IOException, ClassNotFoundException {
 
         return data.deepCopy();
@@ -143,5 +143,5 @@ public class EpeverMetrics implements ArduinoResponseProcessor {
 
     }
 
-
+*/
 }

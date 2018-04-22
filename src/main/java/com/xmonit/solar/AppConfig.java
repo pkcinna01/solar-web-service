@@ -31,6 +31,4 @@ public class AppConfig implements ArduinoConfig, EpeverConfig {
 
     @Value("${epever.usb.commPortRegEx}")
     public String epeverSerialNameRegEx;
-
-
 }

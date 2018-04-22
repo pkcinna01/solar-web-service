@@ -13,15 +13,15 @@ import java.io.PrintWriter;
 import java.io.Writer;
 
 
-@RestController("/arduino")
-@Timed
+@RestController()
+@RequestMapping("arduino")
 public class ArduinioController {
 
     @Autowired
     AppConfig appConfig;
 
     @Autowired
-    ArduinoService epeverService;
+    ArduinoService arduinoService;
 
 
     private static String getClientIp(HttpServletRequest request) {
@@ -39,7 +39,7 @@ public class ArduinioController {
     }
 
 
-    @PostMapping(value = "/execute", produces = "application/json")
+    @PostMapping(value = "execute", produces = "application/json")
     public void execute(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
                         @RequestParam(value = "cmd", required = false) String cmd,
                         @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx,
@@ -55,21 +55,21 @@ public class ArduinioController {
 
         boolean bValidate = validate != null ? validate : true;
         Integer reqId = bValidate ? ArduinoSerialBus.AUTO_GENERATE_REQ_ID : ArduinoSerialBus.NO_VALIDATION_REQ_ID;
-        String strResp = epeverService.execute(cmd, ttyRegEx, reqId );
+        String strResp = arduinoService.execute(cmd, ttyRegEx, reqId );
 
         respWriter.write(strResp);
 
     }
 
-    @GetMapping(value = "/arduinoData", produces = "application/json")
+    @GetMapping(value = "data", produces = "application/json")
     @ResponseBody
     public ArduinoGetResponse arduinoData() throws IOException, ClassNotFoundException {
 
-        return epeverService.arduinoMetrics.getLatestResponse();
+        return arduinoService.arduinoMetrics.getLatestResponse();
     }
 
 
-    @RequestMapping("/help")
+    @RequestMapping("help")
     public void help(Writer respWriter, HttpServletResponse resp) {
 
         resp.setContentType("text/plain");
@@ -85,7 +85,7 @@ public class ArduinioController {
     }
 
 
-    @RequestMapping("/")
+    @RequestMapping("")
     public void index(Writer respWriter, HttpServletResponse resp) {
         help(respWriter, resp);
     }

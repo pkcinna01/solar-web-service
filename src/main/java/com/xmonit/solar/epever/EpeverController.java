@@ -1,18 +1,21 @@
 package com.xmonit.solar.epever;
 
 import com.xmonit.solar.AppConfig;
-import com.xmonit.solar.arduino.ArduinoService;
-import io.micrometer.core.annotation.Timed;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.Writer;
 
 
-@RestController("/epever")
-@Timed
+@RestController()
+@RequestMapping("epever")
 public class EpeverController {
 
     @Autowired
@@ -22,7 +25,7 @@ public class EpeverController {
     EpeverService epeverService;
 
 
-    @RequestMapping("/help")
+    @RequestMapping("help")
     public void help(Writer respWriter, HttpServletResponse resp) {
 
         resp.setContentType("text/plain");
@@ -32,30 +35,20 @@ public class EpeverController {
         pw.println("USB EPEver Charge Controller client");
         pw.println("Data is available in Prometheus format at /actuator/prometheus");
         pw.println();
-
-        //new ArduinoAbout().printHelp(pw);
     }
 
-    @RequestMapping("/test")
-    public void test(Writer respWriter, HttpServletResponse resp) {
+    @GetMapping("fields")
+    public ResponseEntity fields() throws Exception {
+        return fields(".*");
 
-        resp.setContentType("text/plain");
-        resp.setCharacterEncoding("UTF-8");
-
-        PrintWriter pw = new PrintWriter(respWriter);
-        pw.println("USB EPEver Charge Controller client");
-
-        try {
-            epeverService.print(pw);
-        } catch (EpeverException e) {
-            e.printStackTrace(pw);
-        }
-        pw.println();
-
-        //new ArduinoAbout().printHelp(pw);
     }
 
-    @RequestMapping("/")
+    @GetMapping("fields/{nameFilter}")
+    public ResponseEntity fields(@PathVariable String nameFilter) throws Exception {
+        return new ResponseEntity(epeverService.findFieldsByNameGroupBySerialPortName(nameFilter),HttpStatus.OK);
+    }
+
+    @RequestMapping("")
     public void index(Writer respWriter, HttpServletResponse resp) {
         help(respWriter, resp);
     }
