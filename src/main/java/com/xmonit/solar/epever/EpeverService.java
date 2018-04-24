@@ -26,6 +26,27 @@ import static com.xmonit.solar.epever.EpeverFieldDefinitions.REAL_TIME_CLOCK;
 public class EpeverService {
 
     private static final Logger logger = LoggerFactory.getLogger(EpeverService.class);
+
+    class MetricsSource {
+        EpeverSolarCharger charger;
+        EpeverFieldList fields;
+        EpeverMetrics metrics;
+
+        MetricsSource() {
+            charger = new EpeverSolarCharger();
+            fields = new EpeverFieldList(charger, fd -> fd.isStatistic() || fd == REAL_TIME_CLOCK);
+            metrics = new EpeverMetrics(meterRegistry);
+        }
+
+        void init() throws EpeverException {
+            metrics.init(charger,fields);
+        }
+
+        void invalidate(Exception ex) {
+            fields.reset();
+        }
+    }
+
     MeterRegistry meterRegistry;
     List<MetricsSource> metricSourceList = new LinkedList();
     AppConfig conf;
@@ -40,12 +61,19 @@ public class EpeverService {
     public void initMetricsSources() {
 
         List<String> serialNames = EpeverSolarCharger.findSerialNames(conf.getEpeverSerialNameRegEx());
-        releaseMetricsSources();
+        //releaseMetricsSources();
         for (String serialName : serialNames) {
             MetricsSource ms = new MetricsSource();
             try {
                 ms.charger.init(serialName);
                 logger.info(serialName + " charge controller intialized");
+                ms.charger.connect();
+                try {
+                    logger.info(ms.charger.getDeviceInfo().toString());
+                } finally {
+                    ms.charger.disconnect();
+                }
+                ms.init();
                 metricSourceList.add(ms);
             } catch (Exception e) {
                 logger.error("Failed initializing solar charger '" + serialName + "'");
@@ -55,11 +83,7 @@ public class EpeverService {
 
     public void releaseMetricsSources() {
         for (MetricsSource ms : metricSourceList) {
-            /*try {
-                ms.charger.disconnect();
-            } catch (ModbusIOException e) {
-                logger.error("Failed disconnecting solar charger '" + ms.charger.getSerialName() + "'");
-            }*/
+            ms.fields.reset();
         }
         metricSourceList.clear();
     }
@@ -85,6 +109,9 @@ public class EpeverService {
     @Timed
     @Scheduled(fixedDelayString = "${epever.monitoring.updateIntervalMs}")
     private synchronized void updateStats() {
+        if ( metricSourceList.isEmpty() ) {
+            initMetricsSources();
+        }
         for (MetricsSource ms : metricSourceList) {
             final int maxRetryCnt = 2;
             for (int i = 1; i <= maxRetryCnt; i++) {
@@ -107,11 +134,7 @@ public class EpeverService {
                             logger.error(msg);
                         }
                         logger.error("Failed updating monitoring statistics.", ex);
-                        releaseMetricsSources();
-                        initMetricsSources();
-                        //for (ArduinoResponseProcessor p : responseProcessors) {
-                        //    p.invalidate(this, ex);
-                        //}
+                        ms.invalidate(ex);
                     }
                 }
             }
@@ -130,16 +153,5 @@ public class EpeverService {
         }
     }
 
-    class MetricsSource {
-        EpeverSolarCharger charger;
-        EpeverFieldList fields;
-        EpeverMetrics metrics;
-
-        MetricsSource() {
-            charger = new EpeverSolarCharger();
-            fields = new EpeverFieldList(charger, fd -> fd.isStatistic() || fd == REAL_TIME_CLOCK);
-            metrics = new EpeverMetrics(meterRegistry);
-        }
-    }
 
 }

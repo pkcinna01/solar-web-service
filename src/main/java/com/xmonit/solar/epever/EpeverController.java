@@ -45,7 +45,7 @@ public class EpeverController {
 
     @GetMapping("fields/{nameFilter}")
     public ResponseEntity fields(@PathVariable String nameFilter) throws Exception {
-        return new ResponseEntity(epeverService.findFieldsByNameGroupBySerialPortName(nameFilter),HttpStatus.OK);
+        return new ResponseEntity(epeverService.findFieldsByNameGroupBySerialPort(nameFilter),HttpStatus.OK);
     }
 
     @RequestMapping("")

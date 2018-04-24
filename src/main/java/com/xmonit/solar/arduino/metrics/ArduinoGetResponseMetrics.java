@@ -1,9 +1,10 @@
 package com.xmonit.solar.arduino.metrics;
 
-import com.xmonit.solar.arduino.ArduinoSerialBus;
 import com.xmonit.solar.arduino.ArduinoException;
 import com.xmonit.solar.arduino.ArduinoResponseProcessor;
+import com.xmonit.solar.arduino.ArduinoSerialBus;
 import com.xmonit.solar.arduino.data.ArduinoGetResponse;
+import com.xmonit.solar.metrics.UpdateStatsTracker;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import org.codehaus.jackson.JsonNode;
@@ -23,47 +24,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class ArduinoGetResponseMetrics implements ArduinoResponseProcessor {
 
-    public class UpdateStatsTracker {
-        AtomicInteger cnt = new AtomicInteger();
-        AtomicInteger attemptCnt = new AtomicInteger();
-        AtomicInteger successCnt = new AtomicInteger();
-        AtomicInteger successAttemptCnt = new AtomicInteger();
+    public UpdateStatsTracker updateStatsTracker = new UpdateStatsTracker("arduino");
 
-        public void incrementCnt() {
-            cnt.incrementAndGet();
-        }
-
-        public void incrementAttemptCnt() {
-            attemptCnt.incrementAndGet();
-        }
-
-        public void reset() {
-            cnt.set(0);
-            attemptCnt.set(0);
-            successCnt.set(0);
-            successAttemptCnt.set(0);
-        }
-
-        public void succeeded(int tries) {
-            successCnt.incrementAndGet();
-            successAttemptCnt.addAndGet(tries);
-        }
-
-        public void logReliabiltyInfo() {
-            logger.info("USB communications summary:");
-            logger.info("                 total: " + cnt);
-            logger.info("      attempts/request: " + attemptCnt.get()*1.0/cnt.get());
-            logger.info("          unsuccessful: " + (cnt.get() - successCnt.get()));
-            logger.info("      attempts/success: " + (successAttemptCnt.get()*1.0/successCnt.get()));
-        }
-    }
-
-    public UpdateStatsTracker updateStatsTracker = new UpdateStatsTracker();
+    protected ArduinoGetResponse data;
 
     private static final Logger logger = LoggerFactory.getLogger(ArduinoGetResponseMetrics.class);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    protected ArduinoGetResponse data;
     private MeterRegistry registry;
     private AtomicInteger serialReadErrorCnt = new AtomicInteger();
     private AtomicInteger serialReadOk = new AtomicInteger();
@@ -89,8 +56,6 @@ public class ArduinoGetResponseMetrics implements ArduinoResponseProcessor {
         }
         serialReadErrorCnt.set(1);
         serialReadOk.set(0);
-        //data = null;
-        //System.gc();
     }
 
 
@@ -125,6 +90,8 @@ public class ArduinoGetResponseMetrics implements ArduinoResponseProcessor {
     private void initRegistry(final ArduinoSerialBus serialBus, ArduinoGetResponse resp) {
 
         data = resp;
+
+        updateStatsTracker.name = serialBus.commPortName + " arduino";
 
         ArduinoGaugeBuilder builder = new ArduinoGaugeBuilder(serialBus, registry);
 

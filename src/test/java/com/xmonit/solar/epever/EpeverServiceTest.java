@@ -43,8 +43,7 @@ public class EpeverServiceTest {
                         solarCharger.init(commPortName);
                         solarCharger.connect();
                         System.out.println("************ " + commPortName + " ********************");
-                        System.out.println("charger id:" + solarCharger.serverAddressId);
-                        solarCharger.getDeviceInfo().forEach(line->System.out.println(line));
+                        System.out.println(solarCharger.getDeviceInfo());
                         EpeverFieldList fields = EpeverFieldList.createInputRegisterBackedFields(solarCharger);
                         //fields.get(0).readValue();
                         //System.out.println(fields.get(0).name + ": " + fields.get(0));

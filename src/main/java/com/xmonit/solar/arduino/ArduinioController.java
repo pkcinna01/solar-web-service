@@ -2,7 +2,6 @@ package com.xmonit.solar.arduino;
 
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.arduino.data.ArduinoGetResponse;
-import io.micrometer.core.annotation.Timed;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
