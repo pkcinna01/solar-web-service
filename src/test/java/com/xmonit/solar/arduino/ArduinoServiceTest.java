@@ -10,6 +10,7 @@ import org.codehaus.jackson.node.ObjectNode;
 import org.junit.Before;
 import org.junit.Test;
 
+
 import static com.xmonit.solar.arduino.ArduinoSerialBus.NO_VALIDATION_REQ_ID;
 import static org.junit.Assert.*;
 
@@ -39,10 +40,19 @@ public class ArduinoServiceTest {
         //serialBus.setCommPortName( "ttyACM0" );
     }
 
-    @Test public void readUsbLiveData() throws Exception {
+    @Test
+    public void readUsbLiveData() throws Exception {
 
-        String resp = serialBus.execute("GET", null, NO_VALIDATION_REQ_ID);
+        int id = NO_VALIDATION_REQ_ID;
+        long startMs = System.currentTimeMillis();
+        String resp = serialBus.execute("GET", null, id);
         System.out.println(resp);
+        id = 100;
+        resp = serialBus.execute("GET", null, id);
+        System.out.println(resp);
+        resp = serialBus.execute("GET", null, ++id);
+        System.out.println(resp);
+        System.out.println("Elapsed seconds: " + (System.currentTimeMillis()-startMs)/1000.0);
     }
 
     @Test

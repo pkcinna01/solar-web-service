@@ -91,7 +91,7 @@ public class ArduinoGetResponseMetrics implements ArduinoResponseProcessor {
 
         data = resp;
 
-        updateStatsTracker.name = serialBus.commPortName + " arduino";
+        updateStatsTracker.name = serialBus.getPortName() + " arduino";
 
         ArduinoGaugeBuilder builder = new ArduinoGaugeBuilder(serialBus, registry);
 

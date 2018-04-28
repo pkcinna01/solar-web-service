@@ -46,7 +46,7 @@ public class ArduinoGaugeBuilder {
 
     protected List<Tag> getCommonTags() {
         return Collections.singletonList(new ImmutableTag("commPort",
-                serialBus == null ? "" : serialBus.commPortName == null ? "" : serialBus.commPortName));
+                serialBus == null ? "" : serialBus.getPortName() == null ? "" : serialBus.getPortName()));
     }
 
     void init(ArduinoGetResponse resp) {
