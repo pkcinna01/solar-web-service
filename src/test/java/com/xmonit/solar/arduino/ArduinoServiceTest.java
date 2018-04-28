@@ -11,7 +11,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 
-import static com.xmonit.solar.arduino.ArduinoSerialBus.NO_VALIDATION_REQ_ID;
 import static org.junit.Assert.*;
 
 
@@ -43,12 +42,11 @@ public class ArduinoServiceTest {
     @Test
     public void readUsbLiveData() throws Exception {
 
-        int id = NO_VALIDATION_REQ_ID;
+        int id = 100;
         long startMs = System.currentTimeMillis();
         String resp = serialBus.execute("GET", null, id);
         System.out.println(resp);
-        id = 100;
-        resp = serialBus.execute("GET", null, id);
+        resp = serialBus.execute("GET", null, ++id);
         System.out.println(resp);
         resp = serialBus.execute("GET", null, ++id);
         System.out.println(resp);

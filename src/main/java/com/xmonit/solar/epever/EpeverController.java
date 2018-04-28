@@ -1,22 +1,31 @@
 package com.xmonit.solar.epever;
 
 import com.xmonit.solar.AppConfig;
+import com.xmonit.solar.epever.field.EpeverField;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.node.ArrayNode;
+import org.codehaus.jackson.node.JsonNodeFactory;
+import org.codehaus.jackson.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 @RestController()
 @RequestMapping("epever")
 public class EpeverController {
+
+    private static final Logger logger = LoggerFactory.getLogger(EpeverController.class);
 
     @Autowired
     AppConfig appConfig;
@@ -24,6 +33,8 @@ public class EpeverController {
     @Autowired
     EpeverService epeverService;
 
+    //@Autowired
+    //private ObjectMapper objectMapper;
 
     @RequestMapping("help")
     public void help(Writer respWriter, HttpServletResponse resp) {
@@ -37,19 +48,77 @@ public class EpeverController {
         pw.println();
     }
 
-    @GetMapping("fields")
-    public ResponseEntity fields() throws Exception {
+
+    @GetMapping(value="fields", produces="application/json")
+    @ResponseBody
+    public String fields() throws Exception {
         return fields(".*");
 
     }
 
-    @GetMapping("fields/{nameFilter}")
-    public ResponseEntity fields(@PathVariable String nameFilter) throws Exception {
-        return new ResponseEntity(epeverService.findFieldsByNameGroupBySerialPort(nameFilter),HttpStatus.OK);
+
+    @GetMapping(value="fields/{nameFilter}", produces="application/json")
+    @ResponseBody
+    public String fields(@PathVariable String nameFilter) throws Exception {
+
+        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
+        epeverService.readValues(fieldsByCharger);
+        JsonNodeFactory factory = JsonNodeFactory.instance;
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
+            ObjectNode root = factory.objectNode();
+            root.put("port", e.getKey().getSerialName());
+            root.put("model", getChargerModel(e.getKey()));
+            root.put("fields", objectMapper.valueToTree(e.getValue()));
+            return root;
+        }).collect(Collectors.toList());
+        return json.toString();
+    }
+
+    @GetMapping(value="fieldValues", produces="application/json")
+    @ResponseBody
+    public String fieldValues() throws Exception {
+        return fieldValues(".*");
+    }
+
+    private static String getChargerModel(SolarCharger charger) {
+
+        try {
+            return charger.getDeviceInfo().model;
+        } catch (EpeverException ex) {
+            logger.error("Failed getting solar charger device model",ex);
+            return null;
+        }
+    }
+
+    @GetMapping(value="fieldValues/{nameFilter}", produces="application/json")
+    @ResponseBody
+    public String fieldValues(@PathVariable String nameFilter) throws Exception {
+
+        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
+        epeverService.readValues(fieldsByCharger);
+        JsonNodeFactory factory = JsonNodeFactory.instance;
+        List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
+            ObjectNode root = factory.objectNode();
+            root.put("port", e.getKey().getSerialName());
+            root.put("model", getChargerModel(e.getKey()));
+
+            ArrayNode fieldsNode = factory.arrayNode();
+            e.getValue().stream().forEach(f->{
+                ObjectNode n = factory.objectNode();
+                n.put("name",factory.textNode(f.name));
+                n.put("value",factory.numberNode(f.doubleValue()));
+                fieldsNode.add(n);
+            });
+            root.put("fields",fieldsNode);
+            return root;
+        }).collect(Collectors.toList());
+        return json.toString();
     }
 
     @RequestMapping("")
     public void index(Writer respWriter, HttpServletResponse resp) {
+
         help(respWriter, resp);
     }
 

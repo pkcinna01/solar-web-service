@@ -41,8 +41,7 @@ public class ArduinioController {
     @PostMapping(value = "execute", produces = "application/json")
     public void execute(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
                         @RequestParam(value = "cmd", required = false) String cmd,
-                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx,
-                        @RequestParam(value = "validate", required = false) Boolean validate ) throws Exception {
+                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx ) throws Exception {
 
         String strClientIp = getClientIp(req);
 
@@ -52,9 +51,7 @@ public class ArduinioController {
             return;
         }
 
-        boolean bValidate = validate != null ? validate : true;
-        Integer reqId = bValidate ? ArduinoSerialBus.AUTO_GENERATE_REQ_ID : ArduinoSerialBus.NO_VALIDATION_REQ_ID;
-        String strResp = arduinoService.execute(cmd, ttyRegEx, reqId );
+        String strResp = arduinoService.execute(cmd, ttyRegEx, null );
 
         respWriter.write(strResp);
 

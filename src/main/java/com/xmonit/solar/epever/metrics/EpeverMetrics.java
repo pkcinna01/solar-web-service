@@ -42,7 +42,7 @@ public class EpeverMetrics {
 
     public <T> Gauge gauge(SolarCharger charger, String name, T obj, ToDoubleFunction<T> f, List<Tag> tags) {
 
-        Gauge.Builder<T> b = Gauge.builder("epever.solar." + name, obj, f);
+        Gauge.Builder<T> b = Gauge.builder("solar.charger." + name, obj, f);
 
         if (tags != null) {
             b.tags(tags);
@@ -63,8 +63,8 @@ public class EpeverMetrics {
 
     protected List<Tag> getCommonTags(SolarCharger charger) throws EpeverException {
         return Arrays.asList(
-                new ImmutableTag("commPort", charger.getSerialName()),
-                new ImmutableTag("deviceModel", charger.getDeviceInfo().model));
+                new ImmutableTag("port", charger.getSerialName()),
+                new ImmutableTag("model", charger.getDeviceInfo().model));
     }
 
 }
