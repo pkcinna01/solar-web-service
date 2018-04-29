@@ -29,7 +29,7 @@ Grafana, Java, Maven, Nginx, etc...
 
 [(see arduino-solar-serialbus for url syntax)](https://github.com/pkcinna01/arduino-solar-serialbus) 
 ```
-# Launch /opt/prometheus/bin/arduino-solar-client before running curl cmd 
+# View arduino status and configuration
 curl -X POST http://localhost:9202/arduino/execute
 ```
 
@@ -40,7 +40,7 @@ pkcinna@jax1:/opt/prometheus/bin$ curl -X POST http://localhost:9202/arduino/hel
 
 ## Motivation
 
-This project efficiently manages fans for cooling epever solar charge controllers 
+This project manages fans for cooling epever solar charge controllers 
 and the structure they are housed in.  It provides hooks for external applications
 to manage fans and temperatures or let the Arduino app do it.
   
@@ -51,7 +51,7 @@ Maven and Java JDK 1.8+ are required.  Example build:
 
 Build jar from project folder:
 ```
-mvn clean package
+mvn clean package -Dmaven.test.skip
 ```
 **Run as service:**
 
@@ -59,10 +59,11 @@ Use spring boot guide lines for installing spring standalone apps as a service.
 
 From a high level:
 ```
-1) sudo cp target/arduino-solar-client-SNAPSHOT.jar /etc/init.d/arduino-solar-client
-2) chmod ugo+x /etc/init.d/arduino-solar-client
-3) sudo update-rc.d arduino-solar-client defaults
-4) sudo service arduino-solar-client start
+1) sudo cp target/solar-web-service-1.0.SNAPSHOT.jar /etc/init.d/solar-web-service
+2) chmod ugo+x /etc/init.d/solar-web-service
+3) sudo update-rc.d solar-web-service defaults
+4) sudo service solar-web-service start
+5) tail -100f /var/log/solar-web-service.log
 ```
 
 ## Configuration
