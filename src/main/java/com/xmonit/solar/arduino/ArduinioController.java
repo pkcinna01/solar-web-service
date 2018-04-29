@@ -12,6 +12,7 @@ import java.io.PrintWriter;
 import java.io.Writer;
 
 
+@CrossOrigin(origins = {"http://192.168.1.50:80","http://192.168.1.50:443","http://192.168.1.50:8080"})
 @RestController()
 @RequestMapping("arduino")
 public class ArduinioController {

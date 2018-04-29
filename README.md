@@ -1,17 +1,18 @@
-# solar-client
+# solar-web-service
 
 ## Synopsis
 
-Application for Off Grid Solar System using EPEver Charge Controllers
+Application for Off Grid Solar System using EPEver Charge Controllers.  
 1) Queries and updates an Arduino via USB.  The Arduino manages fans and temperatures.
-It also monitors power usage and voltages.
+It Also monitors power usage and voltages.
 2) Queries and updates EPEver Charge Controllers via USB using modbus protocol.
 
-From a high level, it is a web interface for using the 
+From a high level, it is the backend service layer for the 
+[solar-web-client](https://github.com/pkcinna01/solar-web-client) web interface.  It uses the 
 [arduino-solar-serialbus](https://github.com/pkcinna01/arduino-solar-serialbus)
 and
 [epever-solar-modbus](https://github.com/pkcinna01/epever-solar-modbus)
-java jar files.
+java jar files to communicate with the devices connected with USB cables.
 
 This is a Spring Boot web application that runs as a service on Linux on port 9202 by default.
 It uses the Spring Actuator API to expose arduino data in Prometheus and Grafana.

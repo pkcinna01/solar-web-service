@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 @RestController()
 @RequestMapping("epever")
+@CrossOrigin()
 public class EpeverController {
 
     private static final Logger logger = LoggerFactory.getLogger(EpeverController.class);
@@ -77,8 +78,8 @@ public class EpeverController {
 
     @GetMapping(value="fieldValues", produces="application/json")
     @ResponseBody
-    public String fieldValues() throws Exception {
-        return fieldValues(".*");
+    public String fieldValues(@RequestParam(value = "string", required = false) String format) throws Exception {
+        return fieldValues(".*",format);
     }
 
     private static String getChargerModel(SolarCharger charger) {
@@ -93,7 +94,7 @@ public class EpeverController {
 
     @GetMapping(value="fieldValues/{nameFilter}", produces="application/json")
     @ResponseBody
-    public String fieldValues(@PathVariable String nameFilter) throws Exception {
+    public String fieldValues(@PathVariable String nameFilter,@RequestParam(value = "string", required = false) String format) throws Exception {
 
         Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
         epeverService.readValues(fieldsByCharger);
@@ -107,7 +108,11 @@ public class EpeverController {
             e.getValue().stream().forEach(f->{
                 ObjectNode n = factory.objectNode();
                 n.put("name",factory.textNode(f.name));
-                n.put("value",factory.numberNode(f.doubleValue()));
+                if ( format == null || "string".equalsIgnoreCase(format)){
+                    n.put("value", factory.textNode(f.toString()));
+                } else {
+                    n.put("value", factory.numberNode(f.doubleValue()));
+                }
                 fieldsNode.add(n);
             });
             root.put("fields",fieldsNode);
