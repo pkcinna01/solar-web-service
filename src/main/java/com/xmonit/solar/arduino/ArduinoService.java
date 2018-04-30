@@ -18,6 +18,7 @@ public class ArduinoService extends ArduinoSerialBus {
 
     ArduinoGetResponseMetrics arduinoMetrics;
 
+
     public ArduinoService(AppConfig conf, ArduinoGetResponseMetrics arduinoMetrics) {
 
         super(conf, arduinoMetrics);

@@ -29,7 +29,7 @@ public class EpeverService {
 
     AppConfig conf;
     MeterRegistry meterRegistry;
-    List<MetricsSource> metricSourceList = new LinkedList();
+    public List<MetricsSource> metricSourceList = new LinkedList();
 
 
     public EpeverService(AppConfig conf, MeterRegistry meterRegistry) {
@@ -92,7 +92,7 @@ public class EpeverService {
 
         for (MetricsSource ms : metricSourceList) {
             final int maxRetryCnt = 2;
-            for (int i = 1; i <= maxRetryCnt; i++) {
+            for (int attempt = 1; attempt <= maxRetryCnt; attempt++) {
                 ms.metrics.updateStatsTracker.incrementCnt();
                 try {
                     ms.metrics.updateStatsTracker.incrementAttemptCnt();
@@ -102,12 +102,12 @@ public class EpeverService {
                     } finally {
                         ms.charger.disconnect();
                     }
-                    ms.metrics.updateStatsTracker.succeeded(i);
+                    ms.requestSucceeded(attempt);
                     break;
                 } catch (Exception ex) {
-                    if (i == maxRetryCnt) {
+                    if (attempt == maxRetryCnt) {
                         String msg = ex.getMessage();
-                        logger.error("Scheduled EPEver charge controller read failed (attempted " + i + " times). ");
+                        logger.error("Scheduled EPEver charge controller read failed (attempted " + attempt + " times). ");
                         if (msg != null) {
                             logger.error(msg);
                         }

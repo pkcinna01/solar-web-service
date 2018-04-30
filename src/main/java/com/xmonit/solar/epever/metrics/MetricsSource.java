@@ -31,5 +31,14 @@ public class MetricsSource {
     public void invalidate(Exception ex) {
 
         fields.reset();
+        metrics.serialReadErrorCnt.set(1);
+        metrics.serialReadOk.set(0);
+    }
+
+
+    public void requestSucceeded(int attempt) {
+        metrics.updateStatsTracker.succeeded(attempt);
+        metrics.serialReadErrorCnt.set(0);
+        metrics.serialReadOk.set(1);
     }
 }

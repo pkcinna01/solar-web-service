@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToDoubleFunction;
 
 
@@ -29,9 +30,14 @@ public class EpeverMetrics {
 
     public UpdateStatsTracker updateStatsTracker;
 
+    public AtomicInteger serialReadErrorCnt = new AtomicInteger();
+    public AtomicInteger serialReadOk = new AtomicInteger();
+
     protected List<Tag> commonTags;
 
     private MeterRegistry registry;
+
+    String strMetricPrefix = "solar.charger.";
 
 
     public EpeverMetrics(MeterRegistry registry) {
@@ -42,7 +48,7 @@ public class EpeverMetrics {
 
     public <T> Gauge gauge(SolarCharger charger, String name, T obj, ToDoubleFunction<T> f, List<Tag> tags) {
 
-        Gauge.Builder<T> b = Gauge.builder("solar.charger." + name, obj, f);
+        Gauge.Builder<T> b = Gauge.builder(strMetricPrefix + name, obj, f);
 
         if (tags != null) {
             b.tags(tags);
@@ -58,6 +64,13 @@ public class EpeverMetrics {
         for (EpeverField field : fields) {
             gauge(charger, field.getCamelCaseName(), field, EpeverField::doubleValue, commonTags);
         }
+        registry.gauge(strMetricPrefix+"serialReadErrorCnt", commonTags, serialReadErrorCnt);
+        registry.gauge(strMetricPrefix+"serialReadOk", commonTags, serialReadOk);
+
+        registry.gauge(strMetricPrefix+"serial.scheduled.requestCnt", commonTags, updateStatsTracker.cnt);
+        registry.gauge(strMetricPrefix+"serial.scheduled.attemptCnt", commonTags, updateStatsTracker.attemptCnt);
+        registry.gauge(strMetricPrefix+"serial.scheduled.successCnt", commonTags, updateStatsTracker.successCnt);
+        registry.gauge(strMetricPrefix+"serial.scheduled.successAttemptCnt", commonTags, updateStatsTracker.successAttemptCnt);
     }
 
 
