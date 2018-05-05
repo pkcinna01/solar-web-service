@@ -12,9 +12,9 @@ import java.io.PrintWriter;
 import java.io.Writer;
 
 
-@CrossOrigin(origins = {"http://192.168.1.50:80","http://192.168.1.50:443","http://192.168.1.50:8080"})
 @RestController()
 @RequestMapping("arduino")
+@CrossOrigin()
 public class ArduinioController {
 
     @Autowired
@@ -55,6 +55,26 @@ public class ArduinioController {
         String strResp = arduinoService.execute(cmd, ttyRegEx, null );
 
         respWriter.write(strResp);
+
+    }
+
+    @GetMapping(value = "view", produces = "application/json")
+    public void view(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx ) throws Exception {
+
+        String strClientIp = getClientIp(req);
+
+        if (!strClientIp.matches(appConfig.remoteHostRegEx)) {
+            resp.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                    "Invalid client location: " + strClientIp);
+            return;
+        }
+
+        String strResp = arduinoService.execute("GET", ttyRegEx, null );
+
+        respWriter.write("[");
+        respWriter.write(strResp);
+        respWriter.write("]");
 
     }
 

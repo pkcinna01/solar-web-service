@@ -7,6 +7,11 @@ import com.xmonit.solar.epever.field.EpeverFieldList;
 import com.xmonit.solar.epever.metrics.MetricsSource;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.node.ArrayNode;
+import org.codehaus.jackson.node.JsonNodeFactory;
+import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -17,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 
@@ -26,6 +32,15 @@ public class EpeverService {
 
 
     private static final Logger logger = LoggerFactory.getLogger(EpeverService.class);
+
+    public static String getModel(SolarCharger charger) {
+        try {
+            return charger.getDeviceInfo().model;
+        } catch (EpeverException ex) {
+            logger.error("Failed getting solar charger device model",ex);
+            return null;
+        }
+    }
 
     AppConfig conf;
     MeterRegistry meterRegistry;
@@ -48,13 +63,16 @@ public class EpeverService {
     }
 
 
-    public synchronized Map<SolarCharger, List<EpeverField>> findFieldsByNameGroupByCharger(String titlePattern) throws Exception {
+    public Map<SolarCharger, List<EpeverField>> findFieldsByNameGroupByCharger(String titlePattern) throws Exception {
+        return findFieldsGroupByCharger( f -> f.name.matches(titlePattern) );
+    }
 
-        Map<SolarCharger, List<EpeverField>> fieldsByCharger = new LinkedHashMap();
+    public synchronized Map<SolarCharger, List<EpeverField>> findFieldsGroupByCharger(Predicate<EpeverField> filterOp) throws Exception {
+       Map<SolarCharger, List<EpeverField>> fieldsByCharger = new LinkedHashMap();
 
         for (MetricsSource ms : metricSourceList) {
 
-            List<EpeverField> fields = EpeverFieldList.masterFieldList.stream().filter(f -> f.name.matches(titlePattern))
+            List<EpeverField> fields = EpeverFieldList.masterFieldList.stream().filter(filterOp)
                 .map( f-> EpeverField.createByAddr(ms.charger,f.addr) ).collect(Collectors.toList());
             fieldsByCharger.put(ms.charger, fields);
         }
@@ -62,6 +80,42 @@ public class EpeverService {
         return fieldsByCharger;
     }
 
+
+    public List<JsonNode> asJson(Map<SolarCharger,List<EpeverField>> fieldsByCharger ){
+        JsonNodeFactory factory = JsonNodeFactory.instance;
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
+            ObjectNode root = factory.objectNode();
+            root.put("port", e.getKey().getSerialName());
+            root.put("model", getModel(e.getKey()));
+            List<EpeverField> fields = e.getValue();
+            ArrayNode fieldsNode = factory.arrayNode();
+            e.getValue().stream().forEach(f->{ fieldsNode.add(f.asJson()); });
+            root.put("fields",fieldsNode);
+            return root;
+        }).collect(Collectors.toList());
+        return json;
+    }
+
+
+    public List<JsonNode> valuesAsJson(Map<SolarCharger,List<EpeverField>> fieldsByCharger ){
+        JsonNodeFactory factory = JsonNodeFactory.instance;
+        List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
+            ObjectNode root = factory.objectNode();
+            SolarCharger charger = e.getKey();
+            root.put("port", charger.getSerialName());
+            root.put("model", EpeverService.getModel(charger));
+
+            ArrayNode fieldsNode = factory.arrayNode();
+            e.getValue().stream().forEach(f->{
+                ObjectNode n = f.valueAsJson();
+                fieldsNode.add(n);
+            });
+            root.put("fields",fieldsNode);
+            return root;
+        }).collect(Collectors.toList());
+        return json;
+    }
 
     public void readValues(Map<SolarCharger,List<EpeverField>> fieldsByCharger) throws ModbusIOException, EpeverException {
 
@@ -71,7 +125,7 @@ public class EpeverService {
     }
 
 
-    public void readValues(SolarCharger charger, List<EpeverField> fields) throws ModbusIOException, EpeverException {
+    public synchronized void readValues(SolarCharger charger, List<EpeverField> fields) throws ModbusIOException, EpeverException {
 
         charger.connect();
 
@@ -82,16 +136,27 @@ public class EpeverService {
         }
     }
 
+    public Map<SolarCharger,List<EpeverField>> getCachedMetrics() throws Exception {
+        return getCachedMetrics( f -> true); // all metrics
+    }
+
+    public synchronized  Map<SolarCharger,List<EpeverField>> getCachedMetrics(Predicate<EpeverField> filterOp) throws Exception {
+        Map<SolarCharger, List<EpeverField>> fieldsByCharger = new LinkedHashMap();
+        for (MetricsSource ms : metricSourceList) {
+            fieldsByCharger.put(ms.charger, ms.fields.stream().filter(f->!f.isRating()&&filterOp.test(f)).collect(Collectors.toList()));
+        }
+        return fieldsByCharger;
+    }
 
     /**
      * Updates Spring Actuator framework with latest data from EPEver charge controllers
      */
     @Timed
     @Scheduled(fixedDelayString = "${epever.monitoring.updateIntervalMs}")
-    private synchronized void updateStats() {
+    private synchronized void refreshMetrics() {
 
         for (MetricsSource ms : metricSourceList) {
-            final int maxRetryCnt = 2;
+            final int maxRetryCnt = 3;
             for (int attempt = 1; attempt <= maxRetryCnt; attempt++) {
                 ms.metrics.updateStatsTracker.incrementCnt();
                 try {
@@ -113,7 +178,15 @@ public class EpeverService {
                         }
                         logger.error("Failed updating monitoring statistics.", ex);
                         ms.invalidate(ex);
+                    } else {
+                        try {
+                            Thread.sleep(1500);
+                        } catch (InterruptedException e) {
+                            logger.error(e.getLocalizedMessage() + " (" + Thread.currentThread().getStackTrace()[1].toString() + ")" );
+                        }
+                        logger.warn("Scheduled EPEver charge controller read failed (attempted #" + attempt + "). ");
                     }
+
                 }
             }
         }

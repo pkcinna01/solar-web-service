@@ -2,10 +2,9 @@ package com.xmonit.solar.epever.metrics;
 
 import com.xmonit.solar.epever.EpeverException;
 import com.xmonit.solar.epever.EpeverSolarCharger;
+import com.xmonit.solar.epever.field.EpeverField;
 import com.xmonit.solar.epever.field.EpeverFieldList;
 import io.micrometer.core.instrument.MeterRegistry;
-
-import static com.xmonit.solar.epever.EpeverFieldDefinitions.REAL_TIME_CLOCK;
 
 public class MetricsSource {
 
@@ -17,7 +16,7 @@ public class MetricsSource {
     public MetricsSource(MeterRegistry meterRegistry) {
 
         charger = new EpeverSolarCharger();
-        fields = new EpeverFieldList(charger, fd -> fd.isStatistic());// || fd == REAL_TIME_CLOCK);
+        fields = new EpeverFieldList(charger, fd -> EpeverField.isMetric(fd.registerAddress));// || fd == REAL_TIME_CLOCK);
         metrics = new EpeverMetrics(meterRegistry);
     }
 

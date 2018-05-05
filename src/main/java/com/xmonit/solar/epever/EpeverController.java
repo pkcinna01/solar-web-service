@@ -2,11 +2,7 @@ package com.xmonit.solar.epever;
 
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.epever.field.EpeverField;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ArrayNode;
-import org.codehaus.jackson.node.JsonNodeFactory;
-import org.codehaus.jackson.node.ObjectNode;
+import com.xmonit.solar.epever.metrics.MetricsSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +14,6 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 @RestController()
@@ -50,6 +45,17 @@ public class EpeverController {
     }
 
 
+    @GetMapping(value="devices", produces="application/json")
+    @ResponseBody
+    public ResponseEntity devices() throws Exception {
+        List<SolarCharger.DeviceInfo> deviceInfoList = new LinkedList();
+        for( MetricsSource ms: epeverService.metricSourceList) {
+            deviceInfoList.add(ms.charger.getDeviceInfo());
+        }
+        return new ResponseEntity(deviceInfoList,HttpStatus.OK);
+    }
+
+
     @GetMapping(value="fields", produces="application/json")
     @ResponseBody
     public String fields() throws Exception {
@@ -64,61 +70,34 @@ public class EpeverController {
 
         Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
         epeverService.readValues(fieldsByCharger);
-        JsonNodeFactory factory = JsonNodeFactory.instance;
-        ObjectMapper objectMapper = new ObjectMapper();
-        List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
-            ObjectNode root = factory.objectNode();
-            root.put("port", e.getKey().getSerialName());
-            root.put("model", getChargerModel(e.getKey()));
-            root.put("fields", objectMapper.valueToTree(e.getValue()));
-            return root;
-        }).collect(Collectors.toList());
-        return json.toString();
+        return epeverService.asJson(fieldsByCharger).toString();
+    }
+
+    @GetMapping(value="metrics", produces="application/json")
+    @ResponseBody
+    public String metrics(@RequestParam(value = "useCache", required = false, defaultValue = "true") Boolean useCached) throws Exception {
+
+        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.getCachedMetrics();
+        if( !useCached ) {
+            epeverService.readValues(fieldsByCharger);
+        }
+        return epeverService.valuesAsJson(fieldsByCharger).toString();
     }
 
     @GetMapping(value="fieldValues", produces="application/json")
     @ResponseBody
-    public String fieldValues(@RequestParam(value = "string", required = false) String format) throws Exception {
-        return fieldValues(".*",format);
+    public String fieldValues() throws Exception {
+        return fieldValues(".*");
     }
 
-    private static String getChargerModel(SolarCharger charger) {
-
-        try {
-            return charger.getDeviceInfo().model;
-        } catch (EpeverException ex) {
-            logger.error("Failed getting solar charger device model",ex);
-            return null;
-        }
-    }
 
     @GetMapping(value="fieldValues/{nameFilter}", produces="application/json")
     @ResponseBody
-    public String fieldValues(@PathVariable String nameFilter,@RequestParam(value = "string", required = false) String format) throws Exception {
+    public String fieldValues(@PathVariable String nameFilter) throws Exception {
 
         Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
         epeverService.readValues(fieldsByCharger);
-        JsonNodeFactory factory = JsonNodeFactory.instance;
-        List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
-            ObjectNode root = factory.objectNode();
-            root.put("port", e.getKey().getSerialName());
-            root.put("model", getChargerModel(e.getKey()));
-
-            ArrayNode fieldsNode = factory.arrayNode();
-            e.getValue().stream().forEach(f->{
-                ObjectNode n = factory.objectNode();
-                n.put("name",factory.textNode(f.name));
-                if ( format == null || "string".equalsIgnoreCase(format)){
-                    n.put("value", factory.textNode(f.toString()));
-                } else {
-                    n.put("value", factory.numberNode(f.doubleValue()));
-                }
-                fieldsNode.add(n);
-            });
-            root.put("fields",fieldsNode);
-            return root;
-        }).collect(Collectors.toList());
-        return json.toString();
+        return epeverService.valuesAsJson(fieldsByCharger).toString();
     }
 
     @RequestMapping("")
