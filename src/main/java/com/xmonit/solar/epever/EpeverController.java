@@ -45,9 +45,9 @@ public class EpeverController {
     }
 
 
-    @GetMapping(value="devices", produces="application/json")
+    @GetMapping(value="chargers", produces="application/json")
     @ResponseBody
-    public ResponseEntity devices() throws Exception {
+    public ResponseEntity chargers() throws Exception {
         List<SolarCharger.DeviceInfo> deviceInfoList = new LinkedList();
         for( MetricsSource ms: epeverService.metricSourceList) {
             deviceInfoList.add(ms.charger.getDeviceInfo());
@@ -70,14 +70,17 @@ public class EpeverController {
 
         Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
         epeverService.readValues(fieldsByCharger);
+        epeverService.updateCachedMetrics(fieldsByCharger);
         return epeverService.asJson(fieldsByCharger).toString();
     }
 
     @GetMapping(value="metrics", produces="application/json")
     @ResponseBody
-    public String metrics(@RequestParam(value = "useCache", required = false, defaultValue = "true") Boolean useCached) throws Exception {
+    public String metrics(@RequestParam(value = "commPort", required = false) String commPort,
+                          @RequestParam(value = "model", required = false) String model,
+                          @RequestParam(value = "useCache", required = false, defaultValue = "true") Boolean useCached) throws Exception {
 
-        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.getCachedMetrics();
+        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.getCachedMetrics(commPort,model);
         if( !useCached ) {
             epeverService.readValues(fieldsByCharger);
         }

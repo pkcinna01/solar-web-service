@@ -7,6 +7,7 @@ import com.xmonit.solar.epever.field.EpeverFieldList;
 import com.xmonit.solar.epever.metrics.MetricsSource;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.node.ArrayNode;
@@ -86,7 +87,7 @@ public class EpeverService {
         ObjectMapper objectMapper = new ObjectMapper();
         List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
             ObjectNode root = factory.objectNode();
-            root.put("port", e.getKey().getSerialName());
+            root.put("commPort", e.getKey().getSerialName());
             root.put("model", getModel(e.getKey()));
             List<EpeverField> fields = e.getValue();
             ArrayNode fieldsNode = factory.arrayNode();
@@ -103,7 +104,7 @@ public class EpeverService {
         List<JsonNode> json = fieldsByCharger.entrySet().stream().map(e-> {
             ObjectNode root = factory.objectNode();
             SolarCharger charger = e.getKey();
-            root.put("port", charger.getSerialName());
+            root.put("commPort", charger.getSerialName());
             root.put("model", EpeverService.getModel(charger));
 
             ArrayNode fieldsNode = factory.arrayNode();
@@ -136,14 +137,18 @@ public class EpeverService {
         }
     }
 
-    public Map<SolarCharger,List<EpeverField>> getCachedMetrics() throws Exception {
-        return getCachedMetrics( f -> true); // all metrics
+    public Map<SolarCharger,List<EpeverField>> getCachedMetrics(String commPort, String model) throws Exception {
+        return getCachedMetrics(commPort, model, f -> true); // all metrics
     }
 
-    public synchronized  Map<SolarCharger,List<EpeverField>> getCachedMetrics(Predicate<EpeverField> filterOp) throws Exception {
+    public synchronized  Map<SolarCharger,List<EpeverField>> getCachedMetrics(String commPort, String model, Predicate<EpeverField> filterOp) throws Exception {
         Map<SolarCharger, List<EpeverField>> fieldsByCharger = new LinkedHashMap();
         for (MetricsSource ms : metricSourceList) {
-            fieldsByCharger.put(ms.charger, ms.fields.stream().filter(f->!f.isRating()&&filterOp.test(f)).collect(Collectors.toList()));
+            boolean bCommPortOk = StringUtils.isEmpty(commPort) || commPort.equalsIgnoreCase(ms.charger.getSerialName());
+            boolean bModelOk =  StringUtils.isEmpty(model) || model.equalsIgnoreCase(ms.charger.getDeviceInfo().model);
+            if ( bCommPortOk && bModelOk ) {
+                fieldsByCharger.put(ms.charger, ms.fields.stream().filter(f -> !f.isRating() && filterOp.test(f)).collect(Collectors.toList()));
+            }
         }
         return fieldsByCharger;
     }
@@ -230,4 +235,14 @@ public class EpeverService {
         }
     }
 
+    /**
+     * If some request read data from charger controller, update the metrics used for monitoring so
+     * it reflects the latest values too
+     * @param fieldsByCharger
+     */
+    public void updateCachedMetrics(Map<SolarCharger,List<EpeverField>> fieldsByCharger) {
+        for (MetricsSource ms : metricSourceList) {
+            fieldsByCharger.entrySet().stream().filter( entry -> ms.charger == entry.getKey() ).findFirst().ifPresent( e -> ms.fields.updateValues(e.getValue()) );
+        }
+    }
 }
