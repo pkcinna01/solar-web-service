@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -118,7 +119,7 @@ public class EpeverService {
         return json;
     }
 
-    public void readValues(Map<SolarCharger,List<EpeverField>> fieldsByCharger) throws ModbusIOException, EpeverException {
+    public void readValues(Map<SolarCharger,List<EpeverField>> fieldsByCharger) throws Exception {
 
         for( Map.Entry<SolarCharger,List<EpeverField>> entry: fieldsByCharger.entrySet() ) {
             readValues(entry.getKey(),entry.getValue());
@@ -126,15 +127,9 @@ public class EpeverService {
     }
 
 
-    public synchronized void readValues(SolarCharger charger, List<EpeverField> fields) throws ModbusIOException, EpeverException {
+    public synchronized void readValues(SolarCharger charger, List<EpeverField> fields) throws Exception {
 
-        charger.connect();
-
-        try {
-            EpeverFieldList.readValues(charger, fields);
-        } finally {
-            charger.disconnect();
-        }
+        charger.withConnection( () -> EpeverFieldList.readValues(charger, fields) );
     }
 
     public Map<SolarCharger,List<EpeverField>> getCachedMetrics(String commPort, String model) throws Exception {
@@ -166,12 +161,7 @@ public class EpeverService {
                 ms.metrics.updateStatsTracker.incrementCnt();
                 try {
                     ms.metrics.updateStatsTracker.incrementAttemptCnt();
-                    ms.charger.connect();
-                    try {
-                        ms.fields.readValues();
-                    } finally {
-                        ms.charger.disconnect();
-                    }
+                    ms.charger.withConnection( () -> ms.fields.readValues() );
                     ms.requestSucceeded(attempt);
                     break;
                 } catch (Exception ex) {
@@ -211,7 +201,7 @@ public class EpeverService {
     }
 
 
-    protected void init() {
+    protected synchronized void init() {
 
         List<String> serialNames = EpeverSolarCharger.findSerialPortNames(conf.getEpeverSerialNameRegEx());
 
@@ -221,12 +211,7 @@ public class EpeverService {
             try {
                 ms.charger.init(serialName);
                 logger.info(serialName + " charge controller intialized");
-                ms.charger.connect();
-                try {
-                    logger.info(ms.charger.getDeviceInfo().toString());
-                } finally {
-                    ms.charger.disconnect();
-                }
+                ms.charger.withConnection(()->logger.info(ms.charger.getDeviceInfo().toString()));
                 ms.init();
                 metricSourceList.add(ms);
             } catch (Exception e) {
@@ -244,5 +229,17 @@ public class EpeverService {
         for (MetricsSource ms : metricSourceList) {
             fieldsByCharger.entrySet().stream().filter( entry -> ms.charger == entry.getKey() ).findFirst().ifPresent( e -> ms.fields.updateValues(e.getValue()) );
         }
+    }
+
+    public List<EpeverField> findFieldsMatching(String modelPattern, String commPortPattern, String namePattern) throws EpeverException {
+        List<EpeverField> fields = new LinkedList<>();
+        for( MetricsSource ms : metricSourceList) {
+            if ( ms.charger.getDeviceInfo().model.matches(modelPattern)
+                    && ms.charger.getSerialName().matches(commPortPattern)){
+                    EpeverFieldList.masterFieldList.stream().filter(f->f.name.matches(namePattern))
+                            .map( f-> EpeverField.createByAddr(ms.charger,f.addr) ).forEach(fields::add);
+            }
+        }
+        return fields;
     }
 }

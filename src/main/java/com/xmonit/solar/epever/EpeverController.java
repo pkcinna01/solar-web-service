@@ -1,8 +1,13 @@
 package com.xmonit.solar.epever;
 
 import com.xmonit.solar.AppConfig;
+import com.xmonit.solar.epever.field.DateTimeField;
+import com.xmonit.solar.epever.field.DurationField;
 import com.xmonit.solar.epever.field.EpeverField;
+import com.xmonit.solar.epever.field.TimeField;
 import com.xmonit.solar.epever.metrics.MetricsSource;
+import lombok.Data;
+import lombok.ToString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +18,9 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 
@@ -107,6 +115,87 @@ public class EpeverController {
     public void index(Writer respWriter, HttpServletResponse resp) {
 
         help(respWriter, resp);
+    }
+
+    @Data
+    //@ToString
+    static class SettingRequest {
+        String oldValue;
+        String newValue;
+        String commPort;
+        String model;
+        String name;
+    };
+
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    static class FieldNotFoundException extends EpeverException {
+
+        public FieldNotFoundException(String msg) {
+            super(msg);
+        }
+    }
+    @ResponseStatus(HttpStatus.EXPECTATION_FAILED)
+    static class FieldModifiedException extends EpeverException {
+
+        public FieldModifiedException(String msg,Object oldVal, Object newVal) {
+            super(msg + " (old:"+oldVal+",new:"+newVal+")");
+        }
+    }
+
+    protected void validateInSync(EpeverField field, String oldValue) throws Exception{
+        if ( field.doubleValue() != Double.parseDouble(oldValue) ) {
+            throw new FieldModifiedException("Expected old value from client did not match value in charger",
+                    oldValue + " (double form: " + Double.parseDouble(oldValue)+")",
+                    "" + field.getValue() + " (double form: "+field.doubleValue()+")");
+        }
+    }
+
+    @PutMapping(value="setting")
+    @ResponseBody
+    public ResponseEntity<EpeverField> setting(@RequestBody SettingRequest req ) throws Exception {
+        logger.debug(""+req);
+        List<EpeverField> fields = epeverService.findFieldsMatching(req.model,req.commPort,req.name);
+        if ( fields.isEmpty() ) {
+            throw new FieldNotFoundException("No fields matched regex for model, commPort, and name (" + req.model
+            + ", " + req.commPort + ", " + req.name + ")");
+        } else if ( fields.size() > 1 ) {
+            throw new FieldNotFoundException("Multiple fields matched regex for model, commPort, and name (" + req.model
+                    + ", " + req.commPort + ", " + req.name + ")");
+        }
+        EpeverField field = fields.get(0);
+        try {
+            field.withChargerConnection(() -> {
+                field.readValue();
+                String unit = field.unit.name.toLowerCase();
+                switch( unit ) {
+                    case "datetime":
+                        LocalDateTime dateTime = DateTimeField.parse(req.newValue);
+                        logger.info("Saving '" + field.name + "': " + dateTime);
+                        //field.writeValue(dateTime);
+                        break;
+                    case "time":
+                        validateInSync(field,req.oldValue);
+                        LocalTime time = TimeField.parse(req.newValue);
+                        logger.info("Saving '" + field.name + "': " + time);
+                        //field.writeValue(time);
+                        break;
+                    case "duration":
+                        validateInSync(field,req.oldValue);
+                        Duration duration = DurationField.parse(req.newValue);
+                        logger.info("Saving '" + field.name + "': " + duration);
+                        //field.writeValue(duration);
+                        break;
+                    default:
+                        validateInSync(field,req.oldValue);
+                        logger.info("Saving '" + field.name + "': " + req.newValue);
+                        //field.writeValue(duration);
+                }
+            });
+        } catch (Exception ex ) {
+            ex.printStackTrace();
+            throw ex;
+        }
+        return ResponseEntity.ok(field);
     }
 
 }
