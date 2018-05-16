@@ -2,7 +2,9 @@ package com.xmonit.solar.arduino;
 
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.arduino.data.ArduinoGetResponse;
+import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -38,6 +40,20 @@ public class ArduinioController {
         return remoteAddr;
     }
 
+    @Data
+    static class FanModeCommand {
+        public String value;
+        public Boolean persist = true;
+    }
+    @PutMapping(value="fanMode")
+    public void fanMode(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                        @RequestBody  FanModeCommand fanModeCmd ) throws Exception {
+
+        if ( fanModeCmd.value == null || !fanModeCmd.value.matches("^(ON|OFF|AUTO)$") ){
+            throw new Exception("Invalid fan mode: " + fanModeCmd.value );
+        }
+        execute(respWriter, req, resp, "SET_FAN_MODE," + fanModeCmd.value  + "," + (fanModeCmd.persist?"PERSIST":"TRANSIENT"), null);
+    }
 
     @PostMapping(value = "execute", produces = "application/json")
     public void execute(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
