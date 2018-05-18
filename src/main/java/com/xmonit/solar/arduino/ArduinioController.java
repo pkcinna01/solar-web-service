@@ -12,6 +12,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
+import java.util.regex.Pattern;
 
 
 @RestController()
@@ -55,6 +56,39 @@ public class ArduinioController {
         execute(respWriter, req, resp, "SET_FAN_MODE," + fanModeCmd.value  + "," + (fanModeCmd.persist?"PERSIST":"TRANSIENT"), null);
     }
 
+    @Data
+    static class FanTempCommand {
+        public Float value;
+        public String device;
+        public String fan;
+        public String member; // onTemp or offTemp
+        public Boolean persist = true;
+    }
+    @PutMapping(value="device/:componentType")
+    public void device(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                        @RequestBody FanTempCommand fanTempCmd,
+                       @PathVariable String componentType ) throws Exception {
+        if ( "fanTemp".equalsIgnoreCase(componentType)) {
+            //String device = Pattern.quote(fanTempCmd.device);
+            //String fan = Pattern.quote(fanTempCmd.fan);
+            String strOnTemp = "";  // get latest values from arduino first
+            String strOffTemp = "";
+            if ("onTemp".equalsIgnoreCase(fanTempCmd.member)) {
+
+            } else if ("onTemp".equalsIgnoreCase(fanTempCmd.member)) {
+
+            } else {
+                throw new Exception("TODO - add invalid parameter value");
+            }
+            String strCmd = "SET_FAN_THRESHOLDS," + fanTempCmd.device + "," + fanTempCmd.fan + "," + strOnTemp + "," + strOffTemp
+                    + (fanTempCmd.persist ? "PERSIST" : "TRANSIENT");
+            //execute(respWriter, req, resp, strCmd, null);
+        } else {
+            throw new Exception("TODO - should not get here");
+        }
+    }
+
+
     @PostMapping(value = "execute", produces = "application/json")
     public void execute(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
                         @RequestParam(value = "cmd", required = false) String cmd,
@@ -76,7 +110,8 @@ public class ArduinioController {
 
     @GetMapping(value = "view", produces = "application/json")
     public void view(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
-                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx ) throws Exception {
+                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx,
+                        @RequestParam(value = "useCache", required = false, defaultValue = "false") boolean useCached) throws Exception {
 
         String strClientIp = getClientIp(req);
 
@@ -86,12 +121,11 @@ public class ArduinioController {
             return;
         }
 
-        String strResp = arduinoService.execute("GET", ttyRegEx, null );
+        String strResp = arduinoService.execute("GET", ttyRegEx, useCached );
 
         respWriter.write("[");
         respWriter.write(strResp);
         respWriter.write("]");
-
     }
 
     @GetMapping(value = "data", produces = "application/json")

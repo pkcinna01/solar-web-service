@@ -3,6 +3,7 @@ package com.xmonit.solar.arduino;
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.arduino.metrics.ArduinoGetResponseMetrics;
 import io.micrometer.core.annotation.Timed;
+import org.codehaus.jackson.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -17,6 +18,8 @@ public class ArduinoService extends ArduinoSerialBus {
     private static final Logger logger = LoggerFactory.getLogger(ArduinoService.class);
 
     ArduinoGetResponseMetrics arduinoMetrics;
+
+    public String strLastStatsResp;
 
 
     public ArduinoService(AppConfig conf, ArduinoGetResponseMetrics arduinoMetrics) {
@@ -39,6 +42,8 @@ public class ArduinoService extends ArduinoSerialBus {
                 arduinoMetrics.updateStatsTracker.incrementAttemptCnt();
                 String strResp = execute("GET", null, null);
                 processResponse(strResp);
+                lastGet.resp = strResp;
+                lastGet.tty = this.getPortName();
                 arduinoMetrics.updateStatsTracker.succeeded(i);
                 break;
             } catch (Exception ex) {
@@ -69,4 +74,23 @@ public class ArduinoService extends ArduinoSerialBus {
         arduinoMetrics.updateStatsTracker.reset();
     }
 
+    static class CachedCmdResp {
+        public String tty;
+        public String cmd;
+        public String resp;
+    }
+
+    CachedCmdResp lastGet = new CachedCmdResp(){{ cmd = "get";}};
+
+    public String execute(String cmd, String ttyRegEx, boolean useCached) throws Exception {
+        if ( useCached ) {
+            if ( "get".equalsIgnoreCase(cmd) ) {
+                boolean ttyPassed = (ttyRegEx == null) || lastGet.tty != null && lastGet.tty.matches(ttyRegEx);
+                if ( ttyPassed && lastGet.resp != null ) {
+                    return lastGet.resp;
+                }
+            }
+        }
+        return super.execute(cmd,ttyRegEx,null);
+    }
 }
