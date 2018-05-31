@@ -1,14 +1,16 @@
 package com.xmonit.solar.arduino;
 
 import com.xmonit.solar.AppConfig;
+import com.xmonit.solar.arduino.data.ArduinoGetResponse;
 import com.xmonit.solar.arduino.metrics.ArduinoGetResponseMetrics;
 import io.micrometer.core.annotation.Timed;
-import org.codehaus.jackson.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import java.io.IOException;
 
 
 @Service
@@ -42,8 +44,7 @@ public class ArduinoService extends ArduinoSerialBus {
                 arduinoMetrics.updateStatsTracker.incrementAttemptCnt();
                 String strResp = execute("GET", null, null);
                 processResponse(strResp);
-                lastGet.resp = strResp;
-                lastGet.tty = this.getPortName();
+                cachedGetResp.update(this.getPortName(),strResp);
                 arduinoMetrics.updateStatsTracker.succeeded(i);
                 break;
             } catch (Exception ex) {
@@ -74,20 +75,26 @@ public class ArduinoService extends ArduinoSerialBus {
         arduinoMetrics.updateStatsTracker.reset();
     }
 
-    static class CachedCmdResp {
-        public String tty;
-        public String cmd;
-        public String resp;
+
+    @Override
+    public synchronized String execute(String cmd, String ttyRegEx, Integer explicitRequestId) throws Exception {
+        String strResp = super.execute(cmd, ttyRegEx, explicitRequestId);
+        if (cmd.startsWith("SET")) {
+            //TODO - parse strResp as json and check for success before invalidating
+            cachedGetResp.invalidate();
+        }
+        return strResp;
     }
 
-    CachedCmdResp lastGet = new CachedCmdResp(){{ cmd = "get";}};
+
+    private CachedCmdResp cachedGetResp = new CachedCmdResp("get");
 
     public String execute(String cmd, String ttyRegEx, boolean useCached) throws Exception {
         if ( useCached ) {
             if ( "get".equalsIgnoreCase(cmd) ) {
-                boolean ttyPassed = (ttyRegEx == null) || lastGet.tty != null && lastGet.tty.matches(ttyRegEx);
-                if ( ttyPassed && lastGet.resp != null ) {
-                    return lastGet.resp;
+                String cachedGet = cachedGetResp.getLatest(ttyRegEx);
+                if ( cachedGet != null ) {
+                    return cachedGet;
                 }
             }
         }

@@ -16,7 +16,7 @@ public class MetricsSource {
     public MetricsSource(MeterRegistry meterRegistry) {
 
         charger = new EpeverSolarCharger();
-        fields = new EpeverFieldList(charger, fd -> EpeverField.isMetric(fd.registerAddress));// || fd == REAL_TIME_CLOCK);
+        fields = new EpeverFieldList(charger).addFromDefs(fd -> EpeverField.isMetric(fd.registerAddress));// || fd == REAL_TIME_CLOCK);
         metrics = new EpeverMetrics(meterRegistry);
     }
 

@@ -1,24 +1,18 @@
 package com.xmonit.solar.epever;
 
 import com.xmonit.solar.AppConfig;
-import com.xmonit.solar.epever.field.DateTimeField;
-import com.xmonit.solar.epever.field.DurationField;
 import com.xmonit.solar.epever.field.EpeverField;
-import com.xmonit.solar.epever.field.TimeField;
+import com.xmonit.solar.epever.field.EpeverFieldList;
 import com.xmonit.solar.epever.metrics.MetricsSource;
 import lombok.Data;
-import lombok.ToString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import javax.servlet.http.HttpServletResponse;
-import java.io.PrintWriter;
-import java.io.Writer;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 @RestController()
@@ -32,16 +26,16 @@ public class EpeverController {
     static class SettingRequest {
         String oldValue;
         String newValue;
-        String commPort;
-        String model;
+        String chargerId;
         String name;
-    };
+    }
 
     static class RestResponseException extends Exception {
 
         public HttpStatus status;
-        public Map<String,Object> errorMap = new HashMap();
-        public RestResponseException(HttpStatus status, String message, Map errorMap){
+        public Map<String,Object> errorMap = new HashMap<>();
+
+        public RestResponseException(HttpStatus status, String message, Map<String,Object> errorMap){
             super(message);
             this.status = status;
             if ( errorMap != null ) {
@@ -50,6 +44,7 @@ public class EpeverController {
             if ( !this.errorMap.containsKey("message"))
                 this.errorMap.put("message",message);
         }
+
         public RestResponseException(HttpStatus status, EpeverException ex){
             this(status,ex.getMessage());
             errorMap.put("context","exception");
@@ -58,6 +53,7 @@ public class EpeverController {
                 errorMap.put("cause",cause.getMessage());
             }
         }
+
         public RestResponseException(HttpStatus status, Exception ex){
             this(status,ex.getMessage());
             if ( status == HttpStatus.INTERNAL_SERVER_ERROR ) {
@@ -66,9 +62,11 @@ public class EpeverController {
             }
             errorMap.put("context","exception");
         }
+
         public RestResponseException(HttpStatus status, String msg){
             this(status, msg, null);
         }
+
         public ResponseEntity entityResponse() {
             return ResponseEntity.status(status).body(errorMap);
         }
@@ -82,23 +80,10 @@ public class EpeverController {
     EpeverService epeverService;
 
 
-    @RequestMapping("help")
-    public void help(Writer respWriter, HttpServletResponse resp) {
-
-        resp.setContentType("text/plain");
-        resp.setCharacterEncoding("UTF-8");
-
-        PrintWriter pw = new PrintWriter(respWriter);
-        pw.println("USB EPEver Charge Controller client");
-        pw.println("Data is available in Prometheus format at /actuator/prometheus");
-        pw.println();
-    }
-
-
     @GetMapping(value="chargers", produces="application/json")
     @ResponseBody
-    public ResponseEntity chargers() throws Exception {
-        List<SolarCharger.DeviceInfo> deviceInfoList = new LinkedList();
+    public ResponseEntity chargers() {
+        List<SolarCharger.DeviceInfo> deviceInfoList = new LinkedList<>();
         for( MetricsSource ms: epeverService.metricSourceList) {
             deviceInfoList.add(ms.charger.getDeviceInfo());
         }
@@ -108,58 +93,37 @@ public class EpeverController {
 
     @GetMapping(value="fields", produces="application/json")
     @ResponseBody
-    public String fields() throws Exception {
-        return fields(".*");
-
+    public String fields(@RequestParam(value = "chargerId", required = true) String chargerId,
+                         @RequestParam(value = "valuesOnly", defaultValue = "false") boolean valuesOnly) throws Exception {
+        return fields(".*",chargerId,valuesOnly);
     }
 
 
     @GetMapping(value="fields/{nameFilter}", produces="application/json")
     @ResponseBody
-    public String fields(@PathVariable String nameFilter) throws Exception {
+    public String fields(@RequestParam(value = "nameRegEx", required = true) String nameRegEx,
+                         @RequestParam(value = "chargerId", required = true) String chargerId,
+                         @RequestParam(value = "valuesOnly", defaultValue = "false") boolean valuesOnly) throws Exception {
 
-        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
-        epeverService.readValues(fieldsByCharger);
-        epeverService.updateCachedMetrics(fieldsByCharger);
-        return epeverService.asJson(fieldsByCharger).toString();
+        EpeverSolarCharger charger = epeverService.findChargerById(chargerId);
+
+        EpeverFieldList fields = new EpeverFieldList(charger).addFromMaster(f->f.name.matches(nameRegEx));
+        fields.connectAndReadValues();
+        epeverService.updateCachedMetrics(fields);
+        return epeverService.asJson(fields,valuesOnly ? EpeverField::valueAsJson : EpeverField::asJson).toString();
     }
 
 
     @GetMapping(value="metrics", produces="application/json")
     @ResponseBody
-    public String metrics(@RequestParam(value = "commPort", required = false) String commPort,
-                          @RequestParam(value = "model", required = false) String model,
+    public String metrics(@RequestParam(value = "chargerId", required = true) String chargerId,
                           @RequestParam(value = "useCache", required = false, defaultValue = "true") Boolean useCached) throws Exception {
 
-        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.getCachedMetrics(commPort,model);
+        EpeverFieldList fieldList = epeverService.getCachedMetrics(chargerId);
         if( !useCached ) {
-            epeverService.readValues(fieldsByCharger);
+            fieldList.readValues();
         }
-        return epeverService.valuesAsJson(fieldsByCharger).toString();
-    }
-
-
-    @GetMapping(value="fieldValues", produces="application/json")
-    @ResponseBody
-    public String fieldValues() throws Exception {
-        return fieldValues(".*");
-    }
-
-
-    @GetMapping(value="fieldValues/{nameFilter}", produces="application/json")
-    @ResponseBody
-    public String fieldValues(@PathVariable String nameFilter) throws Exception {
-
-        Map<SolarCharger, List<EpeverField>> fieldsByCharger = epeverService.findFieldsByNameGroupByCharger(nameFilter);
-        epeverService.readValues(fieldsByCharger);
-        return epeverService.valuesAsJson(fieldsByCharger).toString();
-    }
-
-
-    @RequestMapping("")
-    public void index(Writer respWriter, HttpServletResponse resp) {
-
-        help(respWriter, resp);
+        return epeverService.asJson(fieldList,EpeverField::valueAsJson).toString();
     }
 
 
@@ -168,18 +132,14 @@ public class EpeverController {
     public ResponseEntity setting(@RequestBody SettingRequest req ) {
         try {
             logger.debug("" + req);
-            List<EpeverField> fields = epeverService.findFieldsMatching(req.model, req.commPort, req.name);
-            if (fields.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("No fields matched regex for model, commPort, and name (" + req.model
-                        + ", " + req.commPort + ", " + req.name + ")");
-            } else if (fields.size() > 1) {
-                return ResponseEntity.status(HttpStatus.EXPECTATION_FAILED).body("Multiple fields matched regex for model, commPort, and name (" + req.model
-                        + ", " + req.commPort + ", " + req.name + ")");
+            EpeverSolarCharger charger = epeverService.findChargerById(req.chargerId);
+            EpeverFieldList fields = new EpeverFieldList(charger).addFromMaster(f->f.name.equals(req.name));
+            if ( fields.size() != 1 ){
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Found " + fields.size() + " fields.  Could not find unique field named: '" + req.name + "'");
             }
             EpeverField field = fields.get(0);
             field.withChargerConnection(() -> {
                 field.readValue();
-                String unit = field.unit.name.toLowerCase();
                 Object newValue = field.parseValue(req.newValue);
                 if ( !"Time".equalsIgnoreCase(field.name)) {
                     validateInSync(field, req.oldValue);
@@ -189,7 +149,8 @@ public class EpeverController {
                 field.readValue();
                 //TBD - writing some hexcode registers causes checksum issues and device needs to be rebooted but save is successful
             });
-            return ResponseEntity.ok(field);
+            String strJsonResp = field.asJson().toString();
+            return ResponseEntity.ok().body(strJsonResp);
         } catch (RestResponseException rex) {
             return rex.entityResponse();
         } catch (EpeverParseException ex) {
@@ -202,18 +163,18 @@ public class EpeverController {
     }
 
 
-    protected void validateInSync(EpeverField field, String strOldValue) throws RestResponseException{
+    private void validateInSync(EpeverField field, String strOldValue) throws RestResponseException{
 
         double oldValue;
         try {
             oldValue = Double.parseDouble(strOldValue);
         } catch (NumberFormatException ex) {
-            String msg = "Could not parse old value from client: " + strOldValue;
+            String msg = "Could not parse old value from client (expected number): " + strOldValue;
             logger.error(msg,ex);
             throw new RestResponseException(HttpStatus.INTERNAL_SERVER_ERROR,msg);
         }
         if ( field.doubleValue() != oldValue ) {
-            HashMap<String,Object> details = new HashMap();
+            HashMap<String,Object> details = new HashMap<>();
             details.put("context","validation");
             details.put("assert","client data is up to date");
             details.put("new",field.getValue());

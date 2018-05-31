@@ -2,9 +2,17 @@ package com.xmonit.solar.arduino;
 
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.arduino.data.ArduinoGetResponse;
+import com.xmonit.solar.arduino.data.Fan;
+import com.xmonit.solar.arduino.data.Voltmeter;
 import lombok.Data;
+import org.apache.commons.lang3.tuple.Pair;
+import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.node.JsonNodeFactory;
+import org.codehaus.jackson.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -12,7 +20,12 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
-import java.util.regex.Pattern;
+import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.stream.Stream;
 
 
 @RestController()
@@ -26,6 +39,7 @@ public class ArduinioController {
     @Autowired
     ArduinoService arduinoService;
 
+    private static final Logger logger = LoggerFactory.getLogger(ArduinioController.class);
 
     private static String getClientIp(HttpServletRequest request) {
 
@@ -46,93 +60,225 @@ public class ArduinioController {
         public String value;
         public Boolean persist = true;
     }
-    @PutMapping(value="fanMode")
-    public void fanMode(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
-                        @RequestBody  FanModeCommand fanModeCmd ) throws Exception {
 
-        if ( fanModeCmd.value == null || !fanModeCmd.value.matches("^(ON|OFF|AUTO)$") ){
-            throw new Exception("Invalid fan mode: " + fanModeCmd.value );
+    @PutMapping(value = "fanMode")
+    public void fanMode(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                        @RequestBody FanModeCommand fanModeCmd) throws Exception {
+
+        if (fanModeCmd.value == null || !fanModeCmd.value.matches("^(ON|OFF|AUTO)$")) {
+            throw new Exception("Invalid fan mode: " + fanModeCmd.value);
         }
-        execute(respWriter, req, resp, "SET_FAN_MODE," + fanModeCmd.value  + "," + (fanModeCmd.persist?"PERSIST":"TRANSIENT"), null);
+        execute(respWriter, req, resp, "SET_FAN_MODE," + fanModeCmd.value + "," + (fanModeCmd.persist ? "PERSIST" : "TRANSIENT"), null);
     }
 
     @Data
-    static class FanTempCommand {
-        public Float value;
-        public String device;
-        public String fan;
+    static class FanCommand {
         public String member; // onTemp or offTemp
+        public double oldValue;
+        public double newValue;
+        public String deviceName;
+        public Fan fan;
         public Boolean persist = true;
     }
-    @PutMapping(value="device/:componentType")
-    public void device(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
-                        @RequestBody FanTempCommand fanTempCmd,
-                       @PathVariable String componentType ) throws Exception {
-        if ( "fanTemp".equalsIgnoreCase(componentType)) {
-            //String device = Pattern.quote(fanTempCmd.device);
-            //String fan = Pattern.quote(fanTempCmd.fan);
-            String strOnTemp = "";  // get latest values from arduino first
-            String strOffTemp = "";
-            if ("onTemp".equalsIgnoreCase(fanTempCmd.member)) {
 
-            } else if ("onTemp".equalsIgnoreCase(fanTempCmd.member)) {
+    @PutMapping(value = "device/{componentType}")
+    public synchronized void device(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                                    @RequestBody FanCommand fanCmd,
+                                    @PathVariable String componentType) throws IOException {
+        try {
+            if ("fanTemp".equalsIgnoreCase(componentType)) {
+                logger.info("Fan request (client): " + fanCmd.toString());
 
+                Fan clientFan = fanCmd.fan;
+
+                String strResp = arduinoService.execute("GET", null, null);
+                ObjectMapper mapper = new ObjectMapper();
+                ArduinoGetResponse getResp = mapper.readValue(strResp, ArduinoGetResponse.class);
+                Fan serverFan = getResp.getDevices().stream().filter(d -> d.getName().equalsIgnoreCase(fanCmd.deviceName)).findAny().map(d -> d.getFans()).orElseGet(LinkedList::new)
+                        .stream().filter(f -> f.getName().equalsIgnoreCase(fanCmd.fan.getName())).findAny().get();
+
+                if (serverFan != null) {
+
+                    logger.info("Fan (server): " + fanCmd.toString());
+
+                    boolean offTempInSync = Math.abs(clientFan.offTemp - serverFan.offTemp) < 0.001;
+                    boolean onTempInSync = Math.abs(clientFan.onTemp - serverFan.onTemp) < 0.001;
+                    if (!offTempInSync) {
+                        throw new Exception("Client and Server fan OFF data out of sync before updating " + fanCmd.member + " (client=" + clientFan.offTemp + ",server=" + serverFan.offTemp + ").  Refresh client/browser and try again.");
+                    } else if (!onTempInSync) {
+                        throw new Exception("Client and Server fan ON data out of sync before updating " + fanCmd.member + " (client=" + clientFan.onTemp + ",server=" + serverFan.onTemp + ").  Refresh client/browser and try again.");
+                    }
+                    if ("onTemp".equalsIgnoreCase(fanCmd.member)) {
+                        if (Math.abs(fanCmd.oldValue - serverFan.onTemp) < 0.001) {
+                            clientFan.setOnTemp(fanCmd.newValue);
+                        } else {
+                            throw new Exception("Client and server data out of sync.  Fan ON threshold temperatures do not match: client=" + fanCmd.oldValue + " server=" + serverFan.onTemp);
+                        }
+                    } else if ("offTemp".equalsIgnoreCase(fanCmd.member)) {
+                        if (Math.abs(fanCmd.oldValue - serverFan.offTemp) < 0.001) {
+                            clientFan.setOffTemp(fanCmd.newValue);
+                        } else {
+                            throw new Exception("Client and server data out of sync.  Fan OFF threshold temperatures do not match: client=" + fanCmd.oldValue + " server=" + serverFan.onTemp);
+                        }
+                    } else {
+                        throw new Exception("TODO - add invalid parameter value");
+                    }
+                    String strCmd = "SET_FAN_THRESHOLDS," + fanCmd.deviceName + "," + clientFan.getName() + "," + clientFan.onTemp + "," + clientFan.offTemp
+                            + "," + (fanCmd.persist ? "PERSIST" : "TRANSIENT");
+                    //logger.info(strCmd);
+                    execute(respWriter, req, resp, strCmd, null);
+                }
             } else {
-                throw new Exception("TODO - add invalid parameter value");
+                throw new Exception("Unsupported device component type: " + componentType);
             }
-            String strCmd = "SET_FAN_THRESHOLDS," + fanTempCmd.device + "," + fanTempCmd.fan + "," + strOnTemp + "," + strOffTemp
-                    + (fanTempCmd.persist ? "PERSIST" : "TRANSIENT");
-            //execute(respWriter, req, resp, strCmd, null);
-        } else {
-            throw new Exception("TODO - should not get here");
+        } catch (Exception ex) {
+            logger.error("Failed saving FAN " + fanCmd.member, ex);
+            JsonNodeFactory nf = JsonNodeFactory.instance;
+            ObjectNode respNode = nf.objectNode();
+            respNode.put("respCode", -1);
+            respNode.put("respMsg", ex.getMessage());
+            respWriter.write(respNode.toString());
         }
     }
 
 
-    @PostMapping(value = "execute", produces = "application/json")
-    public void execute(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
-                        @RequestParam(value = "cmd", required = false) String cmd,
-                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx ) throws Exception {
-
-        String strClientIp = getClientIp(req);
-
-        if (!strClientIp.matches(appConfig.remoteHostRegEx)) {
-            resp.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Invalid client location: " + strClientIp);
-            return;
-        }
-
-        String strResp = arduinoService.execute(cmd, ttyRegEx, null );
-
-        respWriter.write(strResp);
-
+    @Data
+    static class VoltmeterCommand {
+        public String member; // onTemp or offTemp
+        public double oldValue;
+        public double newValue;
+        public String powerMeterName;
+        public Voltmeter voltage;
+        public Boolean persist = true;
     }
 
-    @GetMapping(value = "view", produces = "application/json")
-    public void view(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
-                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx,
-                        @RequestParam(value = "useCache", required = false, defaultValue = "false") boolean useCached) throws Exception {
+    @PutMapping(value = "powerMeter/{componentType}")
+    public synchronized void powerMeter(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                           @RequestBody VoltmeterCommand voltmeterCmd,
+                           @PathVariable String componentType) throws IOException {
+        try {
+            if ("voltmeter".equalsIgnoreCase(componentType)) {
+                String strResp = arduinoService.execute("GET", null, null);
+                ObjectMapper mapper = new ObjectMapper();
+                ArduinoGetResponse getResp = mapper.readValue(strResp, ArduinoGetResponse.class);
+                Voltmeter serverVoltmeter = getResp.getPowerMeters().stream().filter(pm -> pm.getName().equalsIgnoreCase(voltmeterCmd.powerMeterName))
+                        .findAny().map(pm -> pm.getVoltage()).get();
 
-        String strClientIp = getClientIp(req);
+                if (serverVoltmeter != null) {
 
-        if (!strClientIp.matches(appConfig.remoteHostRegEx)) {
-            resp.sendError(HttpServletResponse.SC_UNAUTHORIZED,
-                    "Invalid client location: " + strClientIp);
-            return;
+                    Voltmeter clientVoltMeter = voltmeterCmd.voltage;
+                    Boolean vccInSync = Math.abs(clientVoltMeter.assignedVcc - serverVoltmeter.assignedVcc) < 0.001;
+                    Boolean r1InSync = Math.abs(clientVoltMeter.assignedR1 - serverVoltmeter.assignedR1) < 0.001;
+                    Boolean r2InSync = Math.abs(clientVoltMeter.assignedR2 - serverVoltmeter.assignedR2) < 0.001;
+                    for (Pair<Boolean, String> p : Arrays.asList(Pair.of(vccInSync, "VCC"), Pair.of(r1InSync, "R1"), Pair.of(r2InSync, "R2"))) {
+                        if (!p.getKey()) {
+                            throw new Exception("Client and Server voltage meter " + p.getValue() + " out of sync before updating " + voltmeterCmd.member
+                                    + ".  Refresh client/browser and try again.");
+                        }
+                    }
+
+                    BiConsumer<Voltmeter, Double> setFn;
+                    double serverVal;
+                    String serialCmdArg;
+                    switch (voltmeterCmd.member) {
+                        case "assignedVcc":
+                            setFn = Voltmeter::setAssignedVcc;
+                            serverVal = serverVoltmeter.assignedVcc;
+                            serialCmdArg = "VCC";
+                            break;
+                        case "assignedR1":
+                            setFn = Voltmeter::setAssignedR1;
+                            serverVal = serverVoltmeter.assignedR1;
+                            serialCmdArg = "R1";
+                            break;
+                        case "assignedR2":
+                            setFn = Voltmeter::setAssignedR2;
+                            serverVal = serverVoltmeter.assignedR2;
+                            serialCmdArg = "R2";
+                            break;
+                        default:
+                            throw new Exception("");
+                    }
+                    if (Math.abs(voltmeterCmd.oldValue - serverVal) < 0.001) {
+                        setFn.accept(clientVoltMeter, voltmeterCmd.newValue);
+                        //TBD - any need to send this back to client?
+                    } else {
+                        throw new Exception("Client and server data out of sync.  Voltmeter " + voltmeterCmd.member + " values do not match: client=" + voltmeterCmd.oldValue + " server=" + serverVal);
+                    }
+                    String strCmd = "SET_POWER_METER," + serialCmdArg + "," + voltmeterCmd.powerMeterName + "," + voltmeterCmd.newValue
+                            + "," + (voltmeterCmd.persist ? "PERSIST" : "TRANSIENT");
+                    logger.info(strCmd);
+                    execute(respWriter, req, resp, strCmd, null);
+                }
+            } else {
+                throw new Exception("Unsupported power meter component type: " + componentType);
+            }
+        } catch (Exception ex) {
+            logger.error("Failed saving voltmeter " + voltmeterCmd.member, ex);
+            JsonNodeFactory nf = JsonNodeFactory.instance;
+            ObjectNode respNode = nf.objectNode();
+            respNode.put("respCode", -1);
+            respNode.put("respMsg", ex.getMessage());
+            respWriter.write(respNode.toString());
         }
+    }
 
-        String strResp = arduinoService.execute("GET", ttyRegEx, useCached );
 
+    CachedCmdResp cachedInfoResp = new CachedCmdResp("info");
+
+    @GetMapping(value = "info", produces = "application/json")
+    public void info(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                     @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx,
+                     @RequestParam(value = "useCache", required = false, defaultValue = "true") boolean useCache) throws Exception {
+
+        String strTty = arduinoService.serialPort.getPortName();
+
+        String strResp = null;
+        if (useCache ) {
+            strResp = cachedInfoResp.getLatest(strTty);
+        }
+        if ( strResp == null ){
+            strResp = arduinoService.execute("VERSION", ttyRegEx, useCache);
+            final ObjectMapper mapper = new ObjectMapper();
+
+            JsonNode respNode = mapper.readTree(strResp);
+            JsonNodeFactory factory = JsonNodeFactory.instance;
+            ObjectNode root = factory.objectNode();
+            root.put("commPort", strTty);
+            root.put("version", respNode);
+
+            strResp = root.toString();
+            cachedInfoResp.update(strTty,strResp);
+        }
+        logger.debug("/arduino/info response: " + strResp);
         respWriter.write("[");
         respWriter.write(strResp);
         respWriter.write("]");
     }
 
-    @GetMapping(value = "data", produces = "application/json")
-    @ResponseBody
-    public ArduinoGetResponse arduinoData() throws IOException, ClassNotFoundException {
 
-        return arduinoService.arduinoMetrics.getLatestResponse();
+    @PostMapping(value = "execute", produces = "application/json")
+    public synchronized void execute(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                        @RequestParam(value = "cmd", required = false) String cmd,
+                        @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx) throws Exception {
+
+        String strResp = arduinoService.execute(cmd, ttyRegEx, null);
+
+        respWriter.write(strResp);
+
+    }
+
+
+    @GetMapping(value = "data", produces = "application/json")
+    public void data(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
+                     @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx,
+                     @RequestParam(value = "useCache", required = false, defaultValue = "false") boolean useCache) throws Exception {
+
+        String strResp = arduinoService.execute("GET", ttyRegEx, useCache);
+
+        respWriter.write("[");
+        respWriter.write(strResp);
+        respWriter.write("]");
     }
 
 
