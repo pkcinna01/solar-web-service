@@ -2,8 +2,8 @@ package com.xmonit.solar.arduino;
 
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.arduino.data.ArduinoGetResponse;
-import com.xmonit.solar.arduino.data.Fan;
-import com.xmonit.solar.arduino.data.Voltmeter;
+//import com.xmonit.solar.arduino.data.Fan;
+//import com.xmonit.solar.arduino.data.Voltmeter;
 import lombok.Data;
 import org.apache.commons.lang3.tuple.Pair;
 import org.codehaus.jackson.JsonNode;
@@ -68,7 +68,7 @@ public class ArduinioController {
         if (fanModeCmd.value == null || !fanModeCmd.value.matches("^(ON|OFF|AUTO)$")) {
             throw new Exception("Invalid fan mode: " + fanModeCmd.value);
         }
-        execute(respWriter, req, resp, "SET_FAN_MODE," + fanModeCmd.value + "," + (fanModeCmd.persist ? "PERSIST" : "TRANSIENT"), null);
+        //execute(respWriter, req, resp, "SET_FAN_MODE," + fanModeCmd.value + "," + (fanModeCmd.persist ? "PERSIST" : "TRANSIENT"), null);
     }
 
     @Data
@@ -77,7 +77,7 @@ public class ArduinioController {
         public double oldValue;
         public double newValue;
         public String deviceName;
-        public Fan fan;
+        //public Fan fan;
         public Boolean persist = true;
     }
 
@@ -89,7 +89,7 @@ public class ArduinioController {
             if ("fanTemp".equalsIgnoreCase(componentType)) {
                 logger.info("Fan request (client): " + fanCmd.toString());
 
-                Fan clientFan = fanCmd.fan;
+                /*Fan clientFan = fanCmd.fan;
 
                 String strResp = arduinoService.execute("GET", null, null);
                 ObjectMapper mapper = new ObjectMapper();
@@ -128,6 +128,7 @@ public class ArduinioController {
                     //logger.info(strCmd);
                     execute(respWriter, req, resp, strCmd, null);
                 }
+                */
             } else {
                 throw new Exception("Unsupported device component type: " + componentType);
             }
@@ -148,7 +149,7 @@ public class ArduinioController {
         public double oldValue;
         public double newValue;
         public String powerMeterName;
-        public Voltmeter voltage;
+        //public Voltmeter voltage;
         public Boolean persist = true;
     }
 
@@ -157,6 +158,7 @@ public class ArduinioController {
                            @RequestBody VoltmeterCommand voltmeterCmd,
                            @PathVariable String componentType) throws IOException {
         try {
+            /*
             if ("voltmeter".equalsIgnoreCase(componentType)) {
                 String strResp = arduinoService.execute("GET", null, null);
                 ObjectMapper mapper = new ObjectMapper();
@@ -191,7 +193,7 @@ public class ArduinioController {
                             serverVal = serverVoltmeter.assignedR1;
                             serialCmdArg = "R1";
                             break;
-                        case "assignedR2":
+                        case "assignedR2":x
                             setFn = Voltmeter::setAssignedR2;
                             serverVal = serverVoltmeter.assignedR2;
                             serialCmdArg = "R2";
@@ -213,6 +215,7 @@ public class ArduinioController {
             } else {
                 throw new Exception("Unsupported power meter component type: " + componentType);
             }
+            */
         } catch (Exception ex) {
             logger.error("Failed saving voltmeter " + voltmeterCmd.member, ex);
             JsonNodeFactory nf = JsonNodeFactory.instance;
@@ -238,14 +241,14 @@ public class ArduinioController {
             strResp = cachedInfoResp.getLatest(strTty);
         }
         if ( strResp == null ){
-            strResp = arduinoService.execute("VERSION", ttyRegEx, useCache);
+            strResp = arduinoService.execute("GET,ENV", ttyRegEx, useCache, true);
             final ObjectMapper mapper = new ObjectMapper();
 
             JsonNode respNode = mapper.readTree(strResp);
             JsonNodeFactory factory = JsonNodeFactory.instance;
             ObjectNode root = factory.objectNode();
             root.put("commPort", strTty);
-            root.put("version", respNode);
+            root.put("env", respNode);
 
             strResp = root.toString();
             cachedInfoResp.update(strTty,strResp);
@@ -260,9 +263,10 @@ public class ArduinioController {
     @PostMapping(value = "execute", produces = "application/json")
     public synchronized void execute(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
                         @RequestParam(value = "cmd", required = false) String cmd,
+                        @RequestParam(value = "validate", required = false, defaultValue="true") boolean validate,
                         @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx) throws Exception {
 
-        String strResp = arduinoService.execute(cmd, ttyRegEx, null);
+        String strResp = arduinoService.execute(cmd, ttyRegEx, null, validate);
 
         respWriter.write(strResp);
 
@@ -272,9 +276,11 @@ public class ArduinioController {
     @GetMapping(value = "data", produces = "application/json")
     public void data(Writer respWriter, HttpServletRequest req, HttpServletResponse resp,
                      @RequestParam(value = "commPortRegEx", required = false) String ttyRegEx,
+                     @RequestParam(value = "verbose", required = false, defaultValue = "false") boolean verbose,
+                     @RequestParam(value = "elements", required = false, defaultValue = "SENSORS" /*,DEVICES,OUTPUT_FORMAT,TIME,ENV,SETUP"*/) String elements,
                      @RequestParam(value = "useCache", required = false, defaultValue = "false") boolean useCache) throws Exception {
 
-        String strResp = arduinoService.execute("GET", ttyRegEx, useCache);
+        String strResp = arduinoService.execute( (verbose?"VERBOSE,":"")+"GET,"+elements, ttyRegEx, useCache, true);
 
         respWriter.write("[");
         respWriter.write(strResp);

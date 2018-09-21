@@ -113,7 +113,7 @@ public class EpeverService {
     private synchronized void refreshMetrics() {
 
         for (MetricsSource ms : metricSourceList) {
-            final int maxRetryCnt = 3;
+            final int maxRetryCnt = 6;
             for (int attempt = 1; attempt <= maxRetryCnt; attempt++) {
                 ms.metrics.updateStatsTracker.incrementCnt();
                 try {
@@ -122,8 +122,8 @@ public class EpeverService {
                     ms.requestSucceeded(attempt);
                     break;
                 } catch (Exception ex) {
+                    String msg = ex.getMessage();
                     if (attempt == maxRetryCnt) {
-                        String msg = ex.getMessage();
                         logger.error("Scheduled EPEver charge controller read failed (attempted " + attempt + " times). ");
                         if (msg != null) {
                             logger.error(msg);
@@ -136,7 +136,11 @@ public class EpeverService {
                         } catch (InterruptedException e) {
                             logger.error(e.getLocalizedMessage() + " (" + Thread.currentThread().getStackTrace()[1].toString() + ")" );
                         }
-                        logger.warn("Scheduled EPEver charge controller read failed (attempted #" + attempt + "). ");
+                        logger.warn("Scheduled EPEver charge controller read failed (attempted #" + attempt + ");");
+                        logger.warn("\t" + ex.getClass().getSimpleName() + ": " + msg);
+                        if ( ex.getCause() != null ) {
+                            logger.warn("\t\t" + ex.getCause().getClass().getSimpleName() + ": " + ex.getCause().getMessage());
+                        }
                     }
 
                 }

@@ -37,12 +37,12 @@ public class ArduinoService extends ArduinoSerialBus {
     @Timed
     @Scheduled(fixedDelayString = "${arduino.monitoring.updateIntervalMs}")
     private void updateStats() {
-        final int maxRetryCnt = 2;
+        final int maxRetryCnt = 4;
         arduinoMetrics.updateStatsTracker.incrementCnt();
         for ( int i = 1; i <= maxRetryCnt; i++ ) {
             try {
                 arduinoMetrics.updateStatsTracker.incrementAttemptCnt();
-                String strResp = execute("GET", null, null);
+                String strResp = execute("GET,SENSORS", null, null, true);
                 processResponse(strResp);
                 cachedGetResp.update(this.getPortName(),strResp);
                 arduinoMetrics.updateStatsTracker.succeeded(i);
@@ -77,9 +77,9 @@ public class ArduinoService extends ArduinoSerialBus {
 
 
     @Override
-    public synchronized String execute(String cmd, String ttyRegEx, Integer explicitRequestId) throws Exception {
-        String strResp = super.execute(cmd, ttyRegEx, explicitRequestId);
-        if (cmd.startsWith("SET")) {
+    public synchronized String execute(String cmd, String ttyRegEx, Integer explicitRequestId, boolean validate) throws Exception {
+        String strResp = super.execute(cmd, ttyRegEx, explicitRequestId,validate);
+        if (cmd.startsWith("SET,")||cmd.startsWith("SETUP,")) {
             //TODO - parse strResp as json and check for success before invalidating
             cachedGetResp.invalidate();
         }
@@ -89,15 +89,15 @@ public class ArduinoService extends ArduinoSerialBus {
 
     private CachedCmdResp cachedGetResp = new CachedCmdResp("get");
 
-    public String execute(String cmd, String ttyRegEx, boolean useCached) throws Exception {
+    public String execute(String cmd, String ttyRegEx, boolean useCached, boolean validate) throws Exception {
         if ( useCached ) {
-            if ( "get".equalsIgnoreCase(cmd) ) {
+            if ( "get,sensors".equalsIgnoreCase(cmd) ) {
                 String cachedGet = cachedGetResp.getLatest(ttyRegEx);
                 if ( cachedGet != null ) {
                     return cachedGet;
                 }
             }
         }
-        return super.execute(cmd,ttyRegEx,null);
+        return super.execute(cmd,ttyRegEx,null,validate);
     }
 }
