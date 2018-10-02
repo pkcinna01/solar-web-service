@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToDoubleFunction;
@@ -32,8 +33,6 @@ public class EpeverMetrics {
 
     public AtomicInteger serialReadErrorCnt = new AtomicInteger();
     public AtomicInteger serialReadOk = new AtomicInteger();
-
-    protected List<Tag> commonTags;
 
     private MeterRegistry registry;
 
@@ -60,10 +59,15 @@ public class EpeverMetrics {
 
     public void init(SolarCharger charger, EpeverFieldList fields) throws EpeverException {
         updateStatsTracker = new UpdateStatsTracker(charger.getSerialName() + " (" + charger.getDeviceInfo().model + ")");
-        commonTags = getCommonTags(charger);
+
+        List<Tag> commonFieldTags = Collections.singletonList(new ImmutableTag("model", charger.getDeviceInfo().model));
         for (EpeverField field : fields) {
-            gauge(charger, field.getCamelCaseName(), field, EpeverField::doubleValue, commonTags);
+            gauge(charger, field.getCamelCaseName(), field, EpeverField::doubleValue, commonFieldTags);
         }
+
+        List<Tag> commonTags = Arrays.asList(
+                new ImmutableTag("port", charger.getSerialName()),
+                new ImmutableTag("model", charger.getDeviceInfo().model));
         registry.gauge(strMetricPrefix+"serialReadErrorCnt", commonTags, serialReadErrorCnt);
         registry.gauge(strMetricPrefix+"serialReadOk", commonTags, serialReadOk);
 
@@ -71,13 +75,6 @@ public class EpeverMetrics {
         registry.gauge(strMetricPrefix+"serial.scheduled.attemptCnt", commonTags, updateStatsTracker.attemptCnt);
         registry.gauge(strMetricPrefix+"serial.scheduled.successCnt", commonTags, updateStatsTracker.successCnt);
         registry.gauge(strMetricPrefix+"serial.scheduled.successAttemptCnt", commonTags, updateStatsTracker.successAttemptCnt);
-    }
-
-
-    protected List<Tag> getCommonTags(SolarCharger charger) throws EpeverException {
-        return Arrays.asList(
-                new ImmutableTag("port", charger.getSerialName()),
-                new ImmutableTag("model", charger.getDeviceInfo().model));
     }
 
 }

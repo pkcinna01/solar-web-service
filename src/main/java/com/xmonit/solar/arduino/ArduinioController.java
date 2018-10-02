@@ -8,6 +8,7 @@ import lombok.Data;
 import org.apache.commons.lang3.tuple.Pair;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.node.ArrayNode;
 import org.codehaus.jackson.node.JsonNodeFactory;
 import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
@@ -241,22 +242,23 @@ public class ArduinioController {
             strResp = cachedInfoResp.getLatest(strTty);
         }
         if ( strResp == null ){
-            strResp = arduinoService.execute("GET,ENV", ttyRegEx, useCache, true);
+            strResp = arduinoService.execute("GET,ENV,SETUP", ttyRegEx, useCache, true);
             final ObjectMapper mapper = new ObjectMapper();
 
             JsonNode respNode = mapper.readTree(strResp);
             JsonNodeFactory factory = JsonNodeFactory.instance;
-            ObjectNode root = factory.objectNode();
-            root.put("commPort", strTty);
-            root.put("env", respNode);
+            ArrayNode root = factory.arrayNode();
+            ObjectNode objNode = factory.objectNode();
+            root.add(objNode);
+            objNode.put("commPort", strTty);
+            objNode.put("env", respNode.get("env"));
+            objNode.put("eeprom", respNode.get("eeprom"));
 
             strResp = root.toString();
             cachedInfoResp.update(strTty,strResp);
         }
         logger.debug("/arduino/info response: " + strResp);
-        respWriter.write("[");
         respWriter.write(strResp);
-        respWriter.write("]");
     }
 
 
@@ -282,9 +284,7 @@ public class ArduinioController {
 
         String strResp = arduinoService.execute( (verbose?"VERBOSE,":"")+"GET,"+elements, ttyRegEx, useCache, true);
 
-        respWriter.write("[");
         respWriter.write(strResp);
-        respWriter.write("]");
     }
 
 

@@ -62,23 +62,27 @@ public class ArduinoGetResponseMetrics implements ArduinoResponseProcessor {
     @Override
     public void process(ArduinoSerialBus serialBus, JsonNode arduinoResp) {
 
+        // Arduino returns array of response objects but assuming only single 'GET,SENSORS' was in request
         try {
+            ArduinoGetResponse[] getRespArr = mapper.readValue(arduinoResp, ArduinoGetResponse[].class);
 
-            ArduinoGetResponse getResp = mapper.readValue(arduinoResp, ArduinoGetResponse.class);
+            if ( getRespArr.length == 1 ) {
+                ArduinoGetResponse getResp = getRespArr[0];
+                if (getResp.respCode != 0) {
+                    throw new ArduinoException(getResp.respMsg, getResp.respCode);
+                }
 
-            if (getResp.respCode != 0) {
-                throw new ArduinoException(getResp.respMsg, getResp.respCode);
-            }
+                if (data == null) {
+                    initRegistry(serialBus, getResp);
+                } else {
+                    data.copy(getResp);
+                }
 
-            if (data == null) {
-                initRegistry(serialBus, getResp);
+                serialReadErrorCnt.set(0);
+                serialReadOk.set(1);
             } else {
-                data.copy(getResp);
+                throw new ArduinoException("Expected JSON response array to have one response object but found " + getRespArr.length, -1);
             }
-
-            serialReadErrorCnt.set(0);
-            serialReadOk.set(1);
-
         } catch (Exception ex) {
             invalidate(serialBus, ex);
             logger.error("Failed converting arduino JSON to monitoring metrics");

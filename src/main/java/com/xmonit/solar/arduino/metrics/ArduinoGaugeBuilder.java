@@ -30,8 +30,8 @@ public class ArduinoGaugeBuilder {
 
     public <T> Gauge gauge(String name, T obj, ToDoubleFunction<T> f, List<Tag> tags) {
 
-        Gauge.Builder<T> b = Gauge.builder("arduino.solar." + name, obj, f)
-                .tags(getCommonTags());
+        Gauge.Builder<T> b = Gauge.builder("arduino.solar." + name, obj, f);
+               // .tags(getCommonTags());
 
         if (tags != null) {
             b.tags(tags);
