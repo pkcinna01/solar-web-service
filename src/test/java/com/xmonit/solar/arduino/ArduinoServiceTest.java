@@ -1,17 +1,11 @@
 package com.xmonit.solar.arduino;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xmonit.solar.AppConfig;
-import com.xmonit.solar.arduino.metrics.ArduinoGetResponseMetrics;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ObjectNode;
 import org.junit.Before;
 import org.junit.Test;
-
-
-import static org.junit.Assert.*;
 
 
 public class ArduinoServiceTest {
@@ -23,19 +17,19 @@ public class ArduinoServiceTest {
 
     AppConfig appConfig;
 
-    ArduinoGetResponseMetrics metricsRespHandler;
+    ArduinoMetrics metrics;
 
 
     @Before
     public void initAll() {
         appConfig = new AppConfig();
-        appConfig.cmd = "GET";
+        appConfig.cmd = "GET,SENSORS";
         appConfig.baudRate=38400;
         appConfig.commPortRegEx="ttyACM.*";
         registry = new SimpleMeterRegistry();
-        metricsRespHandler = new ArduinoGetResponseMetrics(registry);
+        metrics = new ArduinoMetrics(registry);
 
-        serialBus = new ArduinoService(appConfig,metricsRespHandler);
+        serialBus = new ArduinoService(appConfig, metrics);
         //serialBus.setCommPortName( "ttyACM0" );
     }
 
@@ -44,11 +38,7 @@ public class ArduinoServiceTest {
 
         int id = 100;
         long startMs = System.currentTimeMillis();
-        String resp = serialBus.execute("GET", null, id);
-        System.out.println(resp);
-        resp = serialBus.execute("GET", null, ++id);
-        System.out.println(resp);
-        resp = serialBus.execute("GET", null, ++id);
+        String resp = serialBus.execute("GET,SENSORS", null, id);
         System.out.println(resp);
         System.out.println("Elapsed seconds: " + (System.currentTimeMillis()-startMs)/1000.0);
     }
@@ -56,9 +46,8 @@ public class ArduinoServiceTest {
     @Test
     public void checkRegistryValues() throws Exception {
 
+/*
         JsonNode respNode = mapper.readTree(MockData.JSON_GET_RESP_STR);
-
-        //serialBus.processResponse(respNode);
 
         assertEquals(2,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
         assertEquals(61.16,registry.get("arduino.solar.tempSensor.temp").tag("device","Bench").tag("tempSensor","DHT").gauge().value(),0.0001);
@@ -81,6 +70,7 @@ public class ArduinoServiceTest {
 
         //serialBus.processResponse(respNode);
         assertEquals(1,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
+        */
     }
 
 

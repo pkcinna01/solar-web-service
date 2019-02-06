@@ -7,6 +7,7 @@ public class MockData {
             "      \"respCode\": -22,\n" +
             "      \"respMsg\": \"Some error occured\"\n" +
             "    }\n";
+    /* data format no longer used...
     public final static String JSON_GET_RESP_STR = "{\n" +
             "      \"fanMode\": 2, \"fanModeText\": \"AUTO\",\n" +
             "      \"powerMeters\": [\n" +
@@ -36,5 +37,5 @@ public class MockData {
             "      \"respCode\": 0,\n" +
             "      \"respMsg\": \"OK\"\n" +
             "    }\n";
-
+*/
 }

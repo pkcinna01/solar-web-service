@@ -1,15 +1,12 @@
 package com.xmonit.solar.epever;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.epever.field.EpeverFieldList;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.junit.Before;
 import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
 
 public class EpeverServiceTest {

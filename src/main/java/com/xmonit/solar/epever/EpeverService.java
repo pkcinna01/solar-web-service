@@ -1,16 +1,16 @@
 package com.xmonit.solar.epever;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.epever.field.EpeverField;
 import com.xmonit.solar.epever.field.EpeverFieldList;
 import com.xmonit.solar.epever.metrics.MetricsSource;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ArrayNode;
-import org.codehaus.jackson.node.JsonNodeFactory;
-import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -58,7 +58,7 @@ public class EpeverService {
     }
 
 
-    public JsonNode asJson(EpeverFieldList fieldList, Function<EpeverField,ObjectNode> fieldToJsonFn){
+    public JsonNode asJson(EpeverFieldList fieldList, Function<EpeverField, ObjectNode> fieldToJsonFn){
         JsonNodeFactory factory = JsonNodeFactory.instance;
         ObjectMapper objectMapper = new ObjectMapper();
         EpeverSolarCharger cc = fieldList.getSolarCharger();
@@ -68,7 +68,7 @@ public class EpeverService {
         root.put("id", cc.getId());
         ArrayNode fieldsNode = factory.arrayNode();
         fieldList.stream().forEach(f->{ fieldsNode.add(f.asJson()); });
-        root.put("fields",fieldsNode);
+        root.set("fields",fieldsNode);
         return root;
     }
 

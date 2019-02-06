@@ -1,16 +1,13 @@
 package com.xmonit.solar.arduino;
 
 import com.xmonit.solar.AppConfig;
-import com.xmonit.solar.arduino.data.ArduinoGetResponse;
-import com.xmonit.solar.arduino.metrics.ArduinoGetResponseMetrics;
+import com.xmonit.solar.arduino.dao.sensor.SensorDao;
 import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
 
 
 @Service
@@ -19,14 +16,12 @@ public class ArduinoService extends ArduinoSerialBus {
 
     private static final Logger logger = LoggerFactory.getLogger(ArduinoService.class);
 
-    ArduinoGetResponseMetrics arduinoMetrics;
-
-    public String strLastStatsResp;
+    ArduinoMetrics arduinoMetrics;
 
 
-    public ArduinoService(AppConfig conf, ArduinoGetResponseMetrics arduinoMetrics) {
+    public ArduinoService(AppConfig conf, ArduinoMetrics arduinoMetrics) {
 
-        super(conf, arduinoMetrics);
+        super(conf);
         this.arduinoMetrics = arduinoMetrics;
     }
 
@@ -37,14 +32,15 @@ public class ArduinoService extends ArduinoSerialBus {
     @Timed
     @Scheduled(fixedDelayString = "${arduino.monitoring.updateIntervalMs}")
     private void updateStats() {
+        logger.debug("START updating stats");
         final int maxRetryCnt = 4;
         arduinoMetrics.updateStatsTracker.incrementCnt();
         for ( int i = 1; i <= maxRetryCnt; i++ ) {
             try {
                 arduinoMetrics.updateStatsTracker.incrementAttemptCnt();
-                String strResp = execute("GET,SENSORS", null, null, true);
-                processResponse(strResp);
-                cachedGetResp.update(this.getPortName(),strResp);
+                SensorDao sensorDao = new SensorDao(this);
+                boolean bVerbose = false; // just want name and value
+                arduinoMetrics.update(getPortName(),sensorDao.list(bVerbose));
                 arduinoMetrics.updateStatsTracker.succeeded(i);
                 break;
             } catch (Exception ex) {
@@ -56,12 +52,11 @@ public class ArduinoService extends ArduinoSerialBus {
                     }
                     logger.error("Failed updating monitoring statistics.",ex);
 
-                    for (ArduinoResponseProcessor p : responseProcessors) {
-                        p.invalidate(this, ex);
-                    }
+                    arduinoMetrics.invalidate(ex);
                 }
             }
         }
+        logger.debug("END: updating stats");
     }
 
 
@@ -75,29 +70,4 @@ public class ArduinoService extends ArduinoSerialBus {
         arduinoMetrics.updateStatsTracker.reset();
     }
 
-
-    @Override
-    public synchronized String execute(String cmd, String ttyRegEx, Integer explicitRequestId, boolean validate) throws Exception {
-        String strResp = super.execute(cmd, ttyRegEx, explicitRequestId,validate);
-        if (cmd.startsWith("SET,")||cmd.startsWith("SETUP,")) {
-            //TODO - parse strResp as json and check for success before invalidating
-            cachedGetResp.invalidate();
-        }
-        return strResp;
-    }
-
-
-    private CachedCmdResp cachedGetResp = new CachedCmdResp("get");
-
-    public String execute(String cmd, String ttyRegEx, boolean useCached, boolean validate) throws Exception {
-        if ( useCached ) {
-            if ( "get,sensors".equalsIgnoreCase(cmd) ) {
-                String cachedGet = cachedGetResp.getLatest(ttyRegEx);
-                if ( cachedGet != null ) {
-                    return cachedGet;
-                }
-            }
-        }
-        return super.execute(cmd,ttyRegEx,null,validate);
-    }
 }
