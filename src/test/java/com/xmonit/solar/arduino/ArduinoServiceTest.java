@@ -2,6 +2,7 @@ package com.xmonit.solar.arduino;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xmonit.solar.AppConfig;
+import com.xmonit.solar.DevAppConfig;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.Before;
@@ -13,7 +14,7 @@ public class ArduinoServiceTest {
     private static ObjectMapper mapper = new ObjectMapper();
 
     MeterRegistry registry;
-    ArduinoService serialBus;
+    ArduinoService arduinoService;
 
     AppConfig appConfig;
 
@@ -21,24 +22,20 @@ public class ArduinoServiceTest {
 
 
     @Before
-    public void initAll() {
-        appConfig = new AppConfig();
-        appConfig.cmd = "GET,SENSORS";
-        appConfig.baudRate=38400;
-        appConfig.commPortRegEx="ttyACM.*";
+    public void initAll() throws ArduinoException {
+        appConfig = new DevAppConfig();
         registry = new SimpleMeterRegistry();
         metrics = new ArduinoMetrics(registry);
 
-        serialBus = new ArduinoService(appConfig, metrics);
-        //serialBus.setCommPortName( "ttyACM0" );
+        arduinoService = new ArduinoService(appConfig,registry);
+        //arduinoService.init();
     }
 
     @Test
     public void readUsbLiveData() throws Exception {
 
-        int id = 100;
         long startMs = System.currentTimeMillis();
-        String resp = serialBus.execute("GET,SENSORS", null, id);
+        String resp = arduinoService.serialBusGroup.values().iterator().next().execute("GET,SENSORS");
         System.out.println(resp);
         System.out.println("Elapsed seconds: " + (System.currentTimeMillis()-startMs)/1000.0);
     }
@@ -62,13 +59,13 @@ public class ArduinoServiceTest {
 
         ObjectNode mutableNode = (ObjectNode) respNode;
         mutableNode.put("fanMode",1);
-        //serialBus.processResponse(respNode);
+        //arduinoService.processResponse(respNode);
         assertEquals(1,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
 
-        //serialBus.processResponse(MockData.JSON_ERROR_RESP_STR);
+        //arduinoService.processResponse(MockData.JSON_ERROR_RESP_STR);
         assertEquals(Double.NaN,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
 
-        //serialBus.processResponse(respNode);
+        //arduinoService.processResponse(respNode);
         assertEquals(1,registry.get("arduino.solar.fanMode").gauge().value(),0.0001);
         */
     }

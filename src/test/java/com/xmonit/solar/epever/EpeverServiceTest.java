@@ -2,6 +2,7 @@ package com.xmonit.solar.epever;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xmonit.solar.AppConfig;
+import com.xmonit.solar.DevAppConfig;
 import com.xmonit.solar.epever.field.EpeverFieldList;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -20,7 +21,7 @@ public class EpeverServiceTest {
 
     @Before
     public void initAll() {
-        appConfig = new AppConfig();
+        appConfig = new DevAppConfig();
         registry = new SimpleMeterRegistry();
         //serialBus = new ArduinoService(appConfig,metricsRespHandler);
         //serialBus.setCommPortName( "ttyACM999" );

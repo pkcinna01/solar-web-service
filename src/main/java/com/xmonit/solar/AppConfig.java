@@ -10,25 +10,40 @@ import org.springframework.context.annotation.Configuration;
 @Data
 public class AppConfig implements ArduinoConfig, EpeverConfig {
 
-    @Value("${arduino.usb.command}")
-    public String cmd;
+    @Value("${arduino.usb.default.baudRate}")
+    public Integer arduinoDefaultBaudRate;
 
-    @Value("${http.remoteHostRegEx}")
-    public String remoteHostRegEx;
+    @Value("${arduino.usb.default.dataBits}")
+    public Integer arduinoDefaultDataBits;
+
+    @Value("${arduino.usb.default.parity}")
+    public Integer arduinoDefaultParity;
+
+    @Value("${arduino.usb.default.stopBits}")
+    public Integer arduinoDefaultStopBits;
+
+    @Value("${arduino.monitoring.updateIntervalMs}")
+    public Integer arduinoUpdateIntervalMs;
 
     @Value("${arduino.usb.commPortRegEx}")
     public String commPortRegEx;
 
-    @Value("${arduino.usb.baudRate}")
-    public Integer baudRate;
-
-    @Value("${arduino.monitoring.updateIntervalMs}")
-    public String arduinoUpdateIntervalMs;
-
+    @Value("${epever.usb.commPortRegEx}")
+    public String epeverSerialNameRegEx;
 
     @Value("${epever.monitoring.updateIntervalMs}")
     public String epeverUpdateIntervalMs;
 
-    @Value("${epever.usb.commPortRegEx}")
-    public String epeverSerialNameRegEx;
+    @Value("${http.remoteHostRegEx}")
+    public String remoteHostRegEx;
+
+    public PortConfig getPortConfig(String hardwareDeviceId) {
+        // just return same settings for all arduino devices for now...
+        PortConfig portConfig = new PortConfig();
+        portConfig.dataBits = arduinoDefaultDataBits;
+        portConfig.baudRate = arduinoDefaultBaudRate;
+        portConfig.parity = arduinoDefaultParity;
+        portConfig.stopBits = arduinoDefaultStopBits;
+        return portConfig;
+    }
 }

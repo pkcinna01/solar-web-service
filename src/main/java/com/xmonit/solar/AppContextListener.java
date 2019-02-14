@@ -24,6 +24,18 @@ import java.util.Scanner;
 @Component
 public class AppContextListener {
 
+    class TemperatureReader {
+
+        public double getValue() {
+            try {
+                String strMilliCelcius = new Scanner(new File("/sys/class/thermal/thermal_zone0/temp")).useDelimiter("\\Z").next();
+                return Double.parseDouble(strMilliCelcius) / 1000.0;
+            } catch (Exception ex) {
+                return Double.NaN;
+            }
+        }
+    }
+
     private static final Logger logger = LoggerFactory.getLogger(AppContextListener.class);
 
     @Autowired
@@ -36,42 +48,6 @@ public class AppContextListener {
     MeterRegistry meterRegistry;
 
     TemperatureReader temperatureReader = new TemperatureReader();
-
-    @EventListener
-    public void handleEvent(Object event) {
-
-        //System.out.println("Event: " + event);
-
-        if (event instanceof ApplicationStartedEvent) {
-
-            try {
-
-                Gauge.Builder<TemperatureReader> b = Gauge.builder("system.temperature.celcius",
-                        temperatureReader, TemperatureReader::getValue);
-
-                b.register(meterRegistry);
-            } catch (Exception ex) {
-                logger.warn(ex.getMessage());
-            }
-
-        } else if (event instanceof ContextClosedEvent) {
-
-            if (arduinoService.isOpen()) {
-                arduinoService.close();
-            }
-
-            for (MetricsSource ms : epeverService.metricSourceList) {
-                try {
-                    ms.charger.disconnect();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
-
-        } else if (event instanceof ContextRefreshedEvent) {
-
-        }
-    }
 
 
     @Bean
@@ -91,15 +67,35 @@ public class AppContextListener {
     }
 
 
-    class TemperatureReader {
+    @EventListener
+    public void handleEvent(Object event) {
 
-        public double getValue() {
+        if (event instanceof ApplicationStartedEvent) {
+
             try {
-                String strMilliCelcius = new Scanner(new File("/sys/class/thermal/thermal_zone0/temp")).useDelimiter("\\Z").next();
-                return Double.parseDouble(strMilliCelcius) / 1000.0;
+
+                Gauge.Builder<TemperatureReader> b = Gauge.builder("system.temperature.celcius",
+                        temperatureReader, TemperatureReader::getValue);
+
+                b.register(meterRegistry);
             } catch (Exception ex) {
-                return Double.NaN;
+                logger.warn(ex.getMessage());
             }
+
+        } else if (event instanceof ContextClosedEvent) {
+
+            arduinoService.close();
+
+            for (MetricsSource ms : epeverService.metricSourceList) {
+                try {
+                    ms.charger.disconnect();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+
+        } else if (event instanceof ContextRefreshedEvent) {
+
         }
     }
 }
