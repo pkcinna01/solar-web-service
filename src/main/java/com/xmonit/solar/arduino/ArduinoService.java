@@ -20,7 +20,7 @@ import java.util.Map;
 
 @Service
 @EnableScheduling
-public class ArduinoService implements ArduinoConfig {
+public class ArduinoService {
 
 	private static final Logger logger = LoggerFactory.getLogger(ArduinoService.class);
 
@@ -57,15 +57,6 @@ public class ArduinoService implements ArduinoConfig {
 
 	public ArduinoSerialBus getBusByName(String arduinoName) {
 		return serialBusGroup.get(arduinoName);
-	}
-
-	@Override
-	public PortConfig getPortConfig(String tty) {
-		// for now return global tty settings
-		PortConfig portConfig = new PortConfig();
-		portConfig.baudRate = conf.arduinoDefaultBaudRate;
-		portConfig.dataBits = conf.arduinoDefaultDataBits;
-		return portConfig;
 	}
 
 	protected synchronized void init() throws ArduinoException {
