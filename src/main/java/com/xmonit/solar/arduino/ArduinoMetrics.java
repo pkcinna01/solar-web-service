@@ -6,9 +6,8 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.ImmutableTag;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedList;
@@ -21,6 +20,7 @@ import java.util.function.ToDoubleFunction;
  * Exposes Arduino data read from USB as monitoring metrics (default is
  * Prometheus)
  */
+@Slf4j
 @Component
 public class ArduinoMetrics {
 
@@ -44,8 +44,6 @@ public class ArduinoMetrics {
 			}
 		}
 	}
-
-	private static final Logger logger = LoggerFactory.getLogger(ArduinoMetrics.class);
 
 	public String arduinoName;
 
@@ -77,6 +75,7 @@ public class ArduinoMetrics {
 
 	private void initRegistry(Sensor[] sensors) {
 
+		log.debug("Initializing monitoring metrics with " + sensors.length + " sensors.");
 		this.sensors = sensors;
 		updateStatsTracker.name = arduinoName + " arduino";
 
@@ -118,7 +117,7 @@ public class ArduinoMetrics {
 			serialReadOk.set(1);
 		} catch (Exception ex) {
 			invalidate(ex);
-			logger.error("Failed converting arduino JSON to monitoring metrics", ex);
+			log.error("Failed converting arduino JSON to monitoring metrics", ex);
 		}
 	}
 

@@ -1,6 +1,5 @@
 package com.xmonit.solar.arduino;
 
-import com.xmonit.solar.arduino.dao.Dao;
 import com.xmonit.solar.arduino.dao.DomainDao;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -11,12 +10,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
 
 abstract public class DomainDaoController<DataT, DaoT extends DomainDao> extends DaoController<DataT, DaoT> {
-
-	// TODO - add annotation to all field accessors and group them on startup
-	@GetMapping(value = "fieldAccessors", produces = "application/json")
-	public List<Dao.FieldMetaData> fieldAccessors() throws ArduinoException {
-		return createDao(null).getFields();
-	}
 
 	@GetMapping(value = "flushItemCache", produces = "application/json")
 	@CacheEvict(cacheNames = "domainItem", allEntries = true)
