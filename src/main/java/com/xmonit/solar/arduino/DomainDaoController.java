@@ -23,24 +23,39 @@ abstract public class DomainDaoController<DataT, DaoT extends DomainDao> extends
 
 	}
 
+	/*
 	@GetMapping(value = "get/{arduinoName}/{id}", produces = "application/json")
 	@Cacheable(cacheNames = "domainItem", key = "{#root.targetClass, #arduinoName, #id}")
 	public DataT getById(@PathVariable String arduinoName, @PathVariable Integer id,
 			@RequestParam(required = false, defaultValue = "true") boolean cached) throws ArduinoException {
-		return createDao(getBus(arduinoName)).get(id);
+		return createDao(getBusByName(arduinoName)).get(id);
 	}
 
 	@GetMapping(value = "list/{arduinoName}", produces = "application/json")
 	@Cacheable(cacheNames = "domainList", key = "{#root.targetClass, #arduinoName}")
 	public DataT[] list(@PathVariable String arduinoName) throws ArduinoException {
-		return createDao(getBus(arduinoName)).list();
+		return createDao(getBusByName(arduinoName)).list();
+	}
+	*/
+
+	@GetMapping(value = "list/{arduinoId}", produces = "application/json")
+	@Cacheable(cacheNames = "domainList", key = "{#root.targetClass, #id}")
+	public DataT[] list(@PathVariable Integer arduinoId) throws ArduinoException {
+		return createDao(getBusById(arduinoId)).list();
+	}
+
+	@GetMapping(value = "get/{arduinoId}/{id}", produces = "application/json")
+	@Cacheable(cacheNames = "domainItem", key = "{#root.targetClass, #arduinoId, #id}")
+	public DataT getById(@PathVariable Integer arduinoId, @PathVariable Integer id,
+						 @RequestParam(required = false, defaultValue = "true") boolean cached) throws ArduinoException {
+		return createDao(getBusById(arduinoId)).get(id);
 	}
 
 	@GetMapping(value = { "list", "" }, produces = "application/json")
 	@Cacheable(cacheNames = "domainList", key = "#root.targetClass")
 	public List<TaskResult<DataT[]>> listAll() throws ArduinoException {
 		AsyncTask<DataT[]> task = (bus) -> {
-			return new TaskResult<DataT[]>(bus.name, bus.id, list(bus.name));
+			return new TaskResult<DataT[]>(bus.name, bus.id, list(bus.id));
 		};
 		return process(getBuses(), task);
 	}

@@ -15,8 +15,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @EnableScheduling
@@ -56,21 +56,22 @@ public class ArduinoService {
 	}
 
 	public ArduinoSerialBus getBusByName(String arduinoName) {
-		return serialBusGroup.get(arduinoName);
+		return serialBusGroup.getByName(arduinoName);
 	}
 
 	protected synchronized void init() throws ArduinoException {
 
 		serialBusGroup.init(PJCArduinoSerialPort.class, conf.commPortRegEx, conf);
 
-		for (Map.Entry<String, ArduinoSerialBus> busEntry : serialBusGroup.entrySet()) {
+		for (ArduinoSerialBus bus : serialBusGroup.values()) {
 			try {
 				ArduinoMetrics metrics = new ArduinoMetrics(meterRegistry);
-				metrics.arduinoName = busEntry.getKey();
-				logger.info(metrics.arduinoName + " arduino intialized using " + busEntry.getValue().getPortName());
+				metrics.arduinoName = bus.name;
+				metrics.arduinoId = bus.id;
+				logger.info(metrics.arduinoName + " arduino intialized using " + bus.getPortName());
 				metricsList.add(metrics);
 			} catch (Exception e) {
-				logger.error("Failed initializing arduino '" + busEntry.getKey() + "'");
+				logger.error("Failed initializing arduino '" + bus.name + "'");
 			}
 		}
 	}
@@ -91,12 +92,12 @@ public class ArduinoService {
 		for (ArduinoMetrics arduinoMetrics : metricsList) {
 			arduinoMetrics.updateStatsTracker.incrementCnt();
 			String arduinoName = arduinoMetrics.arduinoName;
-			ArduinoSerialBus serialBus = serialBusGroup.get(arduinoName);
+			ArduinoSerialBus serialBus = serialBusGroup.getByName(arduinoName);
 			for (int i = 1; i <= maxRetryCnt; i++) {
 				try {
 					arduinoMetrics.updateStatsTracker.incrementAttemptCnt();
 					SensorDao sensorDao = new SensorDao(serialBus);
-					boolean bVerbose = false; // just want name and value
+					boolean bVerbose = arduinoMetrics.getSensors().isEmpty();
 					Sensor[] sensors = sensorDao.list(bVerbose);
 					arduinoMetrics.update(sensors);
 					arduinoMetrics.updateStatsTracker.succeeded(i);
@@ -114,5 +115,9 @@ public class ArduinoService {
 				}
 			}
 		}
+	}
+
+	public Collection<Sensor> getCachedMetrics(Integer arduinoId) {
+		return metricsList.stream().filter( metrics -> metrics.arduinoId == arduinoId ).findAny().get().getSensors();
 	}
 }

@@ -18,10 +18,18 @@ abstract public class DaoController<DataT, DaoT extends Dao> extends AsyncTaskRu
 
 	abstract public DaoT createDao(ArduinoSerialBus sb);
 
-	public ArduinoSerialBus getBus(String name) throws ArduinoException {
-		ArduinoSerialBus bus = arduinoService.serialBusGroup.get(name);
+	public ArduinoSerialBus getBusByName(String name) throws ArduinoException {
+		ArduinoSerialBus bus = arduinoService.serialBusGroup.getByName(name);
 		if (bus == null) {
 			throw new RestException("No serial bus assigned to an arduino named: " + name, HttpStatus.NOT_FOUND);
+		}
+		return bus;
+	}
+
+	public ArduinoSerialBus getBusById(Integer id) throws ArduinoException {
+		ArduinoSerialBus bus = arduinoService.serialBusGroup.getById(id);
+		if (bus == null) {
+			throw new RestException("No serial bus found for ID: " + id, HttpStatus.NOT_FOUND);
 		}
 		return bus;
 	}

@@ -19,17 +19,17 @@ abstract public class SingletonDaoController<DataT, DaoT extends SingletonDao<Da
 
 	}
 
-	@GetMapping(value = "get/{name}", produces = "application/json")
-	@Cacheable(cacheNames = "singleton", key = "{#root.targetClass, #name}")
-	public DataT get(@PathVariable String name) throws ArduinoException {
-		return createDao(getBus(name)).get();
+	@GetMapping(value = "get/{id}", produces = "application/json")
+	@Cacheable(cacheNames = "singleton", key = "{#root.targetClass, #id}")
+	public DataT get(@PathVariable Integer id) throws ArduinoException {
+		return createDao(getBusById(id)).get();
 	}
 
 	@GetMapping(value = { "list", "" }, produces = "application/json")
 	@Cacheable(cacheNames = { "singleton" }, key = "#root.targetClass")
 	public List<TaskResult<DataT>> getAll() throws ArduinoException {
 		AsyncTask<DataT> task = (bus) -> {
-			return new TaskResult<DataT>(bus.name, bus.id, get(bus.name));
+			return new TaskResult<DataT>(bus.name, bus.id, get(bus.id));
 		};
 		return process(getBuses(), task);
 	}

@@ -10,8 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import java.util.function.ToDoubleFunction;
@@ -27,29 +26,31 @@ public class ArduinoMetrics {
 	static class SensorValueSupplier implements Supplier<Number> {
 
 		ArduinoMetrics metrics;
-		int sensorIndex;
+		int sensorId;
 
-		SensorValueSupplier(ArduinoMetrics metrics, int sensorIndex) {
+		SensorValueSupplier(ArduinoMetrics metrics, int sensorId) {
 			this.metrics = metrics;
-			this.sensorIndex = sensorIndex;
+			this.sensorId = sensorId;
 		}
 
 		@Override
 		public Number get() {
-			Sensor[] sensors = metrics.sensors;
-			if (sensors == null) {
+			Sensor sensor = metrics.sensorsById.get(sensorId);
+			if (sensor == null) {
 				return Double.NaN;
 			} else {
-				return sensors[sensorIndex].getValue();
+				return sensor.getValue();
 			}
 		}
 	}
 
 	public String arduinoName;
 
+	public Integer arduinoId;
+
 	private MeterRegistry registry;
 
-	private Sensor[] sensors;
+	private LinkedHashMap<Integer,Sensor> sensorsById = new LinkedHashMap<Integer, Sensor>();
 
 	private AtomicInteger serialReadErrorCnt = new AtomicInteger();
 
@@ -76,16 +77,16 @@ public class ArduinoMetrics {
 	private void initRegistry(Sensor[] sensors) {
 
 		log.debug("Initializing monitoring metrics with " + sensors.length + " sensors.");
-		this.sensors = sensors;
+		sensorsById.clear();
+		for( Sensor s : sensors ) {
+			sensorsById.put(s.id, s);
+		}
 		updateStatsTracker.name = arduinoName + " arduino";
 
-		for (int i = 0; i < sensors.length; i++) {
-			final int sensorIndex = i;
-			// List<Tag> tags = Collections.singletonList(new ImmutableTag("name",
-			// sensor.name));
-			String camelCaseName = StringUtils.uncapitalize(sensors[sensorIndex].name.replaceAll("[ -]", ""));
+		for (Sensor sensor: sensorsById.values()) {
+			String camelCaseName = StringUtils.uncapitalize(sensor.name.replaceAll("[ -]", ""));
 			Gauge.Builder<Supplier<Number>> b = Gauge.builder("arduino.solar." + camelCaseName,
-					new SensorValueSupplier(this, i));
+					new SensorValueSupplier(this, sensor.id));
 			b.register(registry);
 		}
 
@@ -103,15 +104,18 @@ public class ArduinoMetrics {
 	}
 
 	public void invalidate(Exception ex) {
-		sensors = null;
+		sensorsById.clear();
 	}
 
 	public void update(Sensor[] sensors) throws Exception {
 		try {
-			if (this.sensors == null) {
+			if (sensorsById.isEmpty()) {
 				initRegistry(sensors);
 			} else {
-				this.sensors = sensors;
+				for( Sensor s: sensors) {
+					Sensor sensor = sensorsById.get(s.id);
+					sensor.setValue(s.getValue());
+				}
 			}
 			serialReadErrorCnt.set(0);
 			serialReadOk.set(1);
@@ -119,6 +123,11 @@ public class ArduinoMetrics {
 			invalidate(ex);
 			log.error("Failed converting arduino JSON to monitoring metrics", ex);
 		}
+	}
+
+	//TBD - make a deep copy?
+	public Collection<Sensor> getSensors() {
+		return sensorsById.values();
 	}
 
 }

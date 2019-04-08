@@ -15,6 +15,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.CommandLinePropertySource;
 import org.springframework.core.env.SimpleCommandLinePropertySource;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +53,17 @@ public class App {
             }
         };
         return cacheManager;
+    }
+
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/arduino/**").allowedOrigins("http://localhost");
+                registry.addMapping("/epever/**").allowedOrigins("http://localhost");
+            }
+        };
     }
 
     @Bean
