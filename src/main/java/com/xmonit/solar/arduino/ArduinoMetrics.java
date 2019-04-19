@@ -85,8 +85,9 @@ public class ArduinoMetrics {
 
 		for (Sensor sensor: sensorsById.values()) {
 			String camelCaseName = StringUtils.uncapitalize(sensor.name.replaceAll("[ -]", ""));
+			List<Tag> tags = Collections.singletonList(new ImmutableTag("name", sensor.name));
 			Gauge.Builder<Supplier<Number>> b = Gauge.builder("arduino.solar." + camelCaseName,
-					new SensorValueSupplier(this, sensor.id));
+					new SensorValueSupplier(this, sensor.id)).tags(tags);
 			b.register(registry);
 		}
 

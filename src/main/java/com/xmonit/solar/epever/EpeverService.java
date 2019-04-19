@@ -176,7 +176,7 @@ public class EpeverService {
                 ms.init();
                 metricSourceList.add(ms);
             } catch (Exception e) {
-                logger.error("Failed initializing solar charger '" + serialName + "'");
+                logger.error("Failed initializing solar charger '" + serialName + "'", e);
             }
         }
     }

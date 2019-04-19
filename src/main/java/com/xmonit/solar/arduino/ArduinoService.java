@@ -62,6 +62,7 @@ public class ArduinoService {
 	protected synchronized void init() throws ArduinoException {
 
 		serialBusGroup.init(PJCArduinoSerialPort.class, conf.commPortRegEx, conf);
+		//serialBusGroup.init(JSCArduinoSerialPort.class, conf.commPortRegEx, conf);
 
 		for (ArduinoSerialBus bus : serialBusGroup.values()) {
 			try {

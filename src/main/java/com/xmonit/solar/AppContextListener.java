@@ -64,7 +64,8 @@ public class AppContextListener {
                     String name = iff.getName();
                     if (name.matches("(solar[.]charger|arduino[.]).*")
                             || (name.startsWith("logback.events") && iff.getTag("level").matches("(error|warn)"))
-                            || name.matches("jvm[.](memory[.]used).*")) {
+                            || name.matches("jvm[.](memory[.]used).*")
+                            || name.matches( "system[.]temperature.*")) {
                         return false;
                     } else {
                         //System.out.println("denying: " + name);
