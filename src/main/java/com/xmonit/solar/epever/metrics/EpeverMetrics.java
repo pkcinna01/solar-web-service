@@ -1,5 +1,6 @@
 package com.xmonit.solar.epever.metrics;
 
+import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.epever.EpeverException;
 import com.xmonit.solar.epever.SolarCharger;
 import com.xmonit.solar.epever.field.EpeverField;
@@ -17,7 +18,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.ToDoubleFunction;
+import java.util.function.Supplier;
 
 
 /**
@@ -29,6 +30,28 @@ public class EpeverMetrics {
 
     private static final Logger logger = LoggerFactory.getLogger(EpeverMetrics.class);
 
+    class ValueSupplier implements Supplier<Number> {
+
+        EpeverField field;
+
+        public ValueSupplier(EpeverField field) {
+            this.field = field;
+        }
+
+        @Override
+        public Number get() {
+            if (field == null || isExpired() ) {
+                return Double.NaN;
+            } else {
+                return field.doubleValue();
+            }
+        }
+
+        protected boolean isExpired() {
+            return (System.currentTimeMillis() - updateTimeMs) > expiredMetricMs;
+        }
+    }
+
     public UpdateStatsTracker updateStatsTracker;
 
     public AtomicInteger serialReadErrorCnt = new AtomicInteger();
@@ -38,6 +61,7 @@ public class EpeverMetrics {
 
     String strMetricPrefix = "solar.charger.";
 
+    protected long updateTimeMs, expiredMetricMs = 30000;
 
     public EpeverMetrics(MeterRegistry registry) {
 
@@ -45,9 +69,10 @@ public class EpeverMetrics {
     }
 
 
-    public <T> Gauge gauge(SolarCharger charger, String name, T obj, ToDoubleFunction<T> f, List<Tag> tags) {
-
-        Gauge.Builder<T> b = Gauge.builder(strMetricPrefix + name, obj, f);
+    //public <T> Gauge gauge(SolarCharger charger, String name, T obj, ToDoubleFunction<T> f, List<Tag> tags) {
+    public <T> Gauge gauge(SolarCharger charger, String name, EpeverField field, List<Tag> tags) {
+        ValueSupplier valueSupplier = new ValueSupplier(field);
+        Gauge.Builder<Supplier<Number>> b = Gauge.builder(strMetricPrefix + name, valueSupplier);
 
         if (tags != null) {
             b.tags(tags);
@@ -57,12 +82,13 @@ public class EpeverMetrics {
     }
 
 
-    public void init(SolarCharger charger, EpeverFieldList fields) throws EpeverException {
+    public void init(AppConfig conf, SolarCharger charger, EpeverFieldList fields) throws EpeverException {
+        expiredMetricMs = conf.epeverExpiredMetricMs;
         updateStatsTracker = new UpdateStatsTracker(charger.getSerialName() + " (" + charger.getDeviceInfo().model + ")");
 
         List<Tag> commonFieldTags = Collections.singletonList(new ImmutableTag("model", charger.getDeviceInfo().model));
         for (EpeverField field : fields) {
-            gauge(charger, field.getCamelCaseName(), field, EpeverField::doubleValue, commonFieldTags);
+            gauge(charger, field.getCamelCaseName(), field, commonFieldTags);
         }
 
         List<Tag> commonTags = Arrays.asList(

@@ -1,5 +1,6 @@
 package com.xmonit.solar.epever.metrics;
 
+import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.epever.EpeverException;
 import com.xmonit.solar.epever.EpeverSolarCharger;
 import com.xmonit.solar.epever.field.EpeverField;
@@ -21,9 +22,9 @@ public class MetricsSource {
     }
 
 
-    public void init() throws EpeverException {
+    public void init(AppConfig conf) throws EpeverException {
 
-        metrics.init(charger,fields);
+        metrics.init(conf,charger,fields);
     }
 
 
@@ -39,5 +40,6 @@ public class MetricsSource {
         metrics.updateStatsTracker.succeeded(attempt);
         metrics.serialReadErrorCnt.set(0);
         metrics.serialReadOk.set(1);
+        metrics.updateTimeMs = System.currentTimeMillis();
     }
 }

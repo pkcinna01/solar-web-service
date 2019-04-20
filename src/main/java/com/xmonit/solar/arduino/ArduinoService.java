@@ -66,7 +66,7 @@ public class ArduinoService {
 
 		for (ArduinoSerialBus bus : serialBusGroup.values()) {
 			try {
-				ArduinoMetrics metrics = new ArduinoMetrics(meterRegistry);
+				ArduinoMetrics metrics = new ArduinoMetrics(conf,meterRegistry);
 				metrics.arduinoName = bus.name;
 				metrics.arduinoId = bus.id;
 				logger.info(metrics.arduinoName + " arduino intialized using " + bus.getPortName());

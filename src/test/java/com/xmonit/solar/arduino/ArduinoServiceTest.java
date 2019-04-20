@@ -25,7 +25,7 @@ public class ArduinoServiceTest {
     public void initAll() throws ArduinoException {
         appConfig = new DevAppConfig();
         registry = new SimpleMeterRegistry();
-        metrics = new ArduinoMetrics(registry);
+        metrics = new ArduinoMetrics(appConfig,registry);
 
         arduinoService = new ArduinoService(appConfig,registry);
         //arduinoService.init();

@@ -173,7 +173,7 @@ public class EpeverService {
                 ms.charger.init(serialName);
                 logger.info(serialName + " charge controller intialized");
                 ms.charger.withConnection(()->logger.info(ms.charger.getDeviceInfo().toString()));
-                ms.init();
+                ms.init(conf);
                 metricSourceList.add(ms);
             } catch (Exception e) {
                 logger.error("Failed initializing solar charger '" + serialName + "'", e);

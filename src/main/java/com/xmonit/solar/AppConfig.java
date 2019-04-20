@@ -25,6 +25,9 @@ public class AppConfig implements ArduinoConfig, EpeverConfig {
     @Value("${arduino.monitoring.updateIntervalMs}")
     public Integer arduinoUpdateIntervalMs;
 
+    @Value("${arduino.monitoring.expiredMetricMs}")
+    public Integer arduinoExpiredMetricMs;
+
     @Value("${arduino.usb.commPortRegEx}")
     public String commPortRegEx;
 
@@ -32,7 +35,10 @@ public class AppConfig implements ArduinoConfig, EpeverConfig {
     public String epeverSerialNameRegEx;
 
     @Value("${epever.monitoring.updateIntervalMs}")
-    public String epeverUpdateIntervalMs;
+    public Integer epeverUpdateIntervalMs;
+
+    @Value("${epever.monitoring.expiredMetricMs}")
+    public Integer epeverExpiredMetricMs;
 
     @Value("${http.remoteHostRegEx}")
     public String remoteHostRegEx;

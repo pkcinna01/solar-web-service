@@ -1,5 +1,6 @@
 package com.xmonit.solar.arduino;
 
+import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.arduino.data.sensor.Sensor;
 import com.xmonit.solar.metrics.UpdateStatsTracker;
 import io.micrometer.core.instrument.Gauge;
@@ -23,26 +24,27 @@ import java.util.function.ToDoubleFunction;
 @Component
 public class ArduinoMetrics {
 
-	static class SensorValueSupplier implements Supplier<Number> {
 
-		ArduinoMetrics metrics;
+	class SensorValueSupplier implements Supplier<Number> {
+
 		int sensorId;
 
-		SensorValueSupplier(ArduinoMetrics metrics, int sensorId) {
-			this.metrics = metrics;
+		SensorValueSupplier(int sensorId) {
 			this.sensorId = sensorId;
 		}
 
 		@Override
 		public Number get() {
-			Sensor sensor = metrics.sensorsById.get(sensorId);
-			if (sensor == null) {
-				return Double.NaN;
-			} else {
+			Sensor sensor = sensorsById.get(sensorId);
+			if (sensor != null && (System.currentTimeMillis() - sensor.receivedTimeMs) <= expiredMetricMs ) {
 				return sensor.getValue();
+			} else {
+				return Double.NaN;
 			}
 		}
 	}
+
+	long expiredMetricMs;
 
 	public String arduinoName;
 
@@ -58,9 +60,9 @@ public class ArduinoMetrics {
 
 	public UpdateStatsTracker updateStatsTracker = new UpdateStatsTracker("arduino");
 
-	public ArduinoMetrics(MeterRegistry registry) {
-
+	public ArduinoMetrics(AppConfig conf, MeterRegistry registry) {
 		this.registry = registry;
+		expiredMetricMs = conf.arduinoExpiredMetricMs;
 	}
 
 	public <T> Gauge gauge(String name, T obj, ToDoubleFunction<T> f, List<Tag> tags) {
@@ -75,7 +77,6 @@ public class ArduinoMetrics {
 	}
 
 	private void initRegistry(Sensor[] sensors) {
-
 		log.debug("Initializing monitoring metrics with " + sensors.length + " sensors.");
 		sensorsById.clear();
 		for( Sensor s : sensors ) {
@@ -87,7 +88,7 @@ public class ArduinoMetrics {
 			String camelCaseName = StringUtils.uncapitalize(sensor.name.replaceAll("[ -]", ""));
 			List<Tag> tags = Collections.singletonList(new ImmutableTag("name", sensor.name));
 			Gauge.Builder<Supplier<Number>> b = Gauge.builder("arduino.solar." + camelCaseName,
-					new SensorValueSupplier(this, sensor.id)).tags(tags);
+					new SensorValueSupplier(sensor.id)).tags(tags);
 			b.register(registry);
 		}
 
@@ -116,6 +117,7 @@ public class ArduinoMetrics {
 				for( Sensor s: sensors) {
 					Sensor sensor = sensorsById.get(s.id);
 					sensor.setValue(s.getValue());
+					sensor.receivedTimeMs = s.receivedTimeMs;
 				}
 			}
 			serialReadErrorCnt.set(0);
