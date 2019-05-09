@@ -5,14 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.intelligt.modbus.jlibmodbus.serial.*;
 import com.xmonit.solar.AppConfig;
 import com.xmonit.solar.epever.field.EpeverField;
 import com.xmonit.solar.epever.field.EpeverFieldList;
 import com.xmonit.solar.epever.metrics.MetricsSource;
+import com.xmonit.solar.metrics.MetricsWatchdog;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,30 +26,56 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
+@Slf4j
 @Service
 @EnableScheduling
 public class EpeverService {
 
-    private static final Logger logger = LoggerFactory.getLogger(EpeverService.class);
-
+    public List<MetricsSource> metricSourceList = new LinkedList();
     AppConfig conf;
     MeterRegistry meterRegistry;
-    public List<MetricsSource> metricSourceList = new LinkedList();
+    private MetricsWatchdog metricsWatchdog = new MetricsWatchdog<EpeverSolarCharger>("EPEVER"){
+        @Override
+        public synchronized void attemptRecover(){
+            /*EpeverSolarCharger charger = getMetricsSource();
+            if (charger != null ) {
+                try {
+                    log.warn("Attempting disconnect: " + charger.getId());
+                    getMetricsSource().disconnectNow();
+                    log.warn("Attempting connect: " + charger.getId());
+                    getMetricsSource().connect();
+                    log.info("Connected: " + charger.getId());
+                } catch (ModbusIOException e) {
+                    log.error("Failed reseting charger connection.", e);
+                }
+            } else {
+                log.warn("No metrics source found for current step so cannot close the charger connection.");
+            }
+            */
+            log.info("Attempting to restart service from " + getName() + " watchdog");
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command("bash", "-c", "sudo", "/bin/systemctl", "restart", "solar-web");
+            try {
+                Process process = processBuilder.start();
+                //int exitVal = process.waitFor(); //TBD - okay without wait???
+            } catch (Exception e) {
+                log.error("Failed restarting service from " + getName() + " watchdog",e);
+            }
+        }
+    };
 
 
-    public EpeverService(AppConfig conf, MeterRegistry meterRegistry) {
+    public EpeverService(AppConfig conf, MeterRegistry meterRegistry) throws SerialPortException {
 
         this.conf = conf;
         this.meterRegistry = meterRegistry;
         init();
     }
 
-
     public EpeverSolarCharger findCharger(Predicate<SolarCharger> filterOp) {
         Stream<EpeverSolarCharger> chargerStream = metricSourceList.stream().map(ms -> ms.charger);
         return chargerStream.filter(filterOp).findFirst().get();
     }
-
 
     public EpeverSolarCharger findChargerById(String id) {
         Predicate<SolarCharger> filterOp = (charger) -> {
@@ -57,8 +84,7 @@ public class EpeverService {
         return findCharger(filterOp);
     }
 
-
-    public JsonNode asJson(EpeverFieldList fieldList, Function<EpeverField, ObjectNode> fieldToJsonFn){
+    public JsonNode asJson(EpeverFieldList fieldList, Function<EpeverField, ObjectNode> fieldToJsonFn) {
         JsonNodeFactory factory = JsonNodeFactory.instance;
         ObjectMapper objectMapper = new ObjectMapper();
         EpeverSolarCharger cc = fieldList.getSolarCharger();
@@ -67,79 +93,77 @@ public class EpeverService {
         root.put("model", cc.getDeviceInfo().getModel());
         root.put("id", cc.getId());
         ArrayNode fieldsNode = factory.arrayNode();
-        fieldList.stream().forEach(f->{ fieldsNode.add(f.asJson()); });
-        root.set("fields",fieldsNode);
+        fieldList.stream().forEach(f -> {
+            fieldsNode.add(f.asJson());
+        });
+        root.set("fields", fieldsNode);
         return root;
     }
-
-
-    /*
-    public List<JsonNode> asJson(List<EpeverFieldList> fieldLists ){
-        JsonNodeFactory factory = JsonNodeFactory.instance;
-        ObjectMapper objectMapper = new ObjectMapper();
-        List<JsonNode> json = fieldLists.stream().map(fieldList-> asJson(fieldList,EpeverField::asJson)).collect(Collectors.toList());
-        return json;
-    }
-
-
-    public List<JsonNode> valuesAsJson(List<EpeverFieldList> fieldLists ){
-        JsonNodeFactory factory = JsonNodeFactory.instance;
-        ObjectMapper objectMapper = new ObjectMapper();
-        List<JsonNode> json = fieldLists.stream().map(fieldList-> asJson(fieldList,EpeverField::valueAsJson)).collect(Collectors.toList());
-        return json;
-    }*/
-
 
     public EpeverFieldList getCachedMetrics(String chargerId) throws Exception {
         return getCachedMetrics(chargerId, f -> true); // all metrics
     }
 
-
     public synchronized EpeverFieldList getCachedMetrics(String chargerId, Predicate<EpeverField> filterOp) throws Exception {
-        MetricsSource metricsSource = metricSourceList.stream().filter(ms->ms.charger.getId().equals(chargerId)).findFirst().get();
-        if ( metricsSource == null ) {
+        MetricsSource metricsSource = metricSourceList.stream().filter(ms -> ms.charger.getId().equals(chargerId)).findFirst().get();
+        if (metricsSource == null) {
             return null;
         }
         List<EpeverField> fields = metricsSource.fields.stream().filter(f -> !f.isRating() && filterOp.test(f)).collect(Collectors.toList());
-        return new EpeverFieldList(metricsSource.charger,fields);
+        return new EpeverFieldList(metricsSource.charger, fields);
     }
 
 
-    /**
-     * Updates Spring Actuator framework with latest data from EPEver charge controllers
-     */
     @Timed
     @Scheduled(fixedDelayString = "${epever.monitoring.updateIntervalMs}")
-    private synchronized void refreshMetrics() {
+    private void refreshMetrics() {
 
         for (MetricsSource ms : metricSourceList) {
-            final int maxRetryCnt = 6;
+            metricsWatchdog.setStep(ms.charger, "Begin metrics refresh for " + ms.charger.getId());
+            final int maxRetryCnt = 4;
             for (int attempt = 1; attempt <= maxRetryCnt; attempt++) {
                 ms.metrics.updateStatsTracker.incrementCnt();
                 try {
                     ms.metrics.updateStatsTracker.incrementAttemptCnt();
-                    ms.charger.withConnection( () -> ms.fields.readValues() );
+                    if (attempt > 1) {
+                        log.info("Begining attempt #" + attempt);
+                    }
+                    metricsWatchdog.setStep(ms.charger, "Begin withConnection call: " + ms.charger.getId());
+                    final int attemptCnt = attempt;
+                    ms.charger.withConnection(() -> {
+                        if (attemptCnt > 1) {
+                            log.info("Reading field values...");
+                        }
+                        metricsWatchdog.setStep(ms.charger, "Begin field values update: " + ms.charger.getId());
+                        ms.fields.readValues();
+                    });
                     ms.requestSucceeded(attempt);
+                    if (attempt > 1) {
+                        log.info("Success on attempt #" + attempt);
+                    }
+                    metricsWatchdog.setStep(ms.charger, "Field values updated: " + ms.charger.getId());
+                    metricsWatchdog.updateComplete();
                     break;
                 } catch (Exception ex) {
                     String msg = ex.getMessage();
+                    metricsWatchdog.setStep(ms.charger, "" + ex + " occured for " + ms.charger.getId());
                     if (attempt == maxRetryCnt) {
-                        logger.error("Scheduled EPEver charge controller read failed (attempted " + attempt + " times). ");
+                        log.error("Scheduled EPEver charge controller read failed (attempted " + attempt + " times). ");
                         if (msg != null) {
-                            logger.error(msg);
+                            log.error(msg);
                         }
-                        logger.error("Failed updating monitoring statistics.", ex);
+                        log.error("Failed updating monitoring statistics.", ex);
                         ms.invalidate(ex);
                     } else {
                         try {
                             Thread.sleep(1500);
                         } catch (InterruptedException e) {
-                            logger.error(e.getLocalizedMessage() + " (" + Thread.currentThread().getStackTrace()[1].toString() + ")" );
+                            log.error(e.getLocalizedMessage() + " (" + Thread.currentThread().getStackTrace()[1].toString() + ")");
                         }
-                        logger.warn("Scheduled EPEver charge controller read failed (attempted #" + attempt + ");");
-                        logger.warn("\t" + ex.getClass().getSimpleName() + ": " + msg);
-                        if ( ex.getCause() != null ) {
-                            logger.warn("\t\t" + ex.getCause().getClass().getSimpleName() + ": " + ex.getCause().getMessage());
+                        log.warn("Scheduled EPEver charge controller read failed (attempted #" + attempt + ");");
+                        log.warn("\t" + ex.getClass().getSimpleName() + ": " + msg);
+                        if (ex.getCause() != null) {
+                            log.warn("\t\t" + ex.getCause().getClass().getSimpleName() + ": " + ex.getCause().getMessage());
                         }
                     }
 
@@ -162,7 +186,29 @@ public class EpeverService {
     }
 
 
-    protected synchronized void init() {
+    protected synchronized void init() throws SerialPortException {
+
+        log.info("Initializing EPEVER controllers");
+
+        switch (conf.getEpeverSerialImpl().toLowerCase()) {
+            case "jserialcomm":
+            case "jsc":
+                SerialUtils.setSerialPortFactory( new SerialPortFactoryJSerialComm());
+                break;
+            case "scream3r":
+            case "jssc":
+                SerialUtils.setSerialPortFactory( new SerialPortFactoryJSSC());
+                break;
+            //case "rxtx":
+            //    SerialUtils.setSerialPortFactory( new SerialPortFactoryRXTX());
+            //    break;
+            case "purejavacomm":
+            case "pjc":
+            default:
+                SerialUtils.setSerialPortFactory( new SerialPortFactoryPJC());
+                break;
+        }
+        log.info("EPEVER ModBus Implementation: " + SerialUtils.getSerialPortFactory().getClass().getSimpleName());
 
         List<String> serialNames = EpeverSolarCharger.findSerialPortNames(conf.getEpeverSerialNameRegEx());
 
@@ -171,20 +217,36 @@ public class EpeverService {
             MetricsSource ms = new MetricsSource(meterRegistry);
             try {
                 ms.charger.init(serialName);
-                logger.info(serialName + " charge controller intialized");
-                ms.charger.withConnection(()->logger.info(ms.charger.getDeviceInfo().toString()));
+                log.info(serialName + " charge controller intialized");
+                ms.charger.withConnection(() -> log.info(ms.charger.getDeviceInfo().toString()));
                 ms.init(conf);
                 metricSourceList.add(ms);
             } catch (Exception e) {
-                logger.error("Failed initializing solar charger '" + serialName + "'", e);
+                log.error("Failed initializing solar charger '" + serialName + "'", e);
+            }
+        }
+        metricsWatchdog.setMaxAgeMs(conf.epeverExpiredMetricMs);
+        metricsWatchdog.start();
+    }
+
+    public void close() {
+
+        log.info("Stopping EPEVER controllers");
+
+        metricsWatchdog.stop();
+
+        for (MetricsSource ms : metricSourceList) {
+            try {
+                ms.charger.disconnect();
+            } catch (Exception ex) {
+                ex.printStackTrace();
             }
         }
     }
 
-
     public void updateCachedMetrics(EpeverFieldList fieldList) {
         for (MetricsSource ms : metricSourceList) {
-            if ( ms.charger == fieldList.getSolarCharger() ) {
+            if (ms.charger == fieldList.getSolarCharger()) {
                 ms.fields.copyValuesFrom(fieldList);
                 break;
             }

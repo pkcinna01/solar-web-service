@@ -22,11 +22,14 @@ public class AppConfig implements ArduinoConfig, EpeverConfig {
     @Value("${arduino.usb.default.stopBits}")
     public Integer arduinoDefaultStopBits;
 
-    @Value("${arduino.monitoring.updateIntervalMs}")
+    @Value("${arduino.monitoring.updateIntervalMs:15000}")
     public Integer arduinoUpdateIntervalMs;
 
-    @Value("${arduino.monitoring.expiredMetricMs}")
+    @Value("${arduino.monitoring.expiredMetricMs:60000}")
     public Integer arduinoExpiredMetricMs;
+
+    @Value(value="${arduino.usb.impl:JSC}" )
+    public String arduinoSerialBusImpl;
 
     @Value("${arduino.usb.commPortRegEx}")
     public String commPortRegEx;
@@ -34,10 +37,13 @@ public class AppConfig implements ArduinoConfig, EpeverConfig {
     @Value("${epever.usb.commPortRegEx}")
     public String epeverSerialNameRegEx;
 
-    @Value("${epever.monitoring.updateIntervalMs}")
+    @Value("${epever.usb.commPortImpl}")
+    public String epeverSerialImpl;
+
+    @Value("${epever.monitoring.updateIntervalMs:15000}")
     public Integer epeverUpdateIntervalMs;
 
-    @Value("${epever.monitoring.expiredMetricMs}")
+    @Value("${epever.monitoring.expiredMetricMs:60000}")
     public Integer epeverExpiredMetricMs;
 
     @Value("${http.remoteHostRegEx}")

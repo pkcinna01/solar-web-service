@@ -109,7 +109,7 @@ public class ArduinoMetrics {
 		sensorsById.clear();
 	}
 
-	public void update(Sensor[] sensors) throws Exception {
+	public synchronized void update(Sensor[] sensors) throws Exception {
 		try {
 			if (sensorsById.isEmpty()) {
 				initRegistry(sensors);

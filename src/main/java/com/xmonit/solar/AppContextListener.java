@@ -5,7 +5,6 @@ import com.xmonit.solar.arduino.SerialCmd;
 import com.xmonit.solar.arduino.dao.Dao;
 import com.xmonit.solar.arduino.dao.annotation.*;
 import com.xmonit.solar.epever.EpeverService;
-import com.xmonit.solar.epever.metrics.MetricsSource;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.config.MeterFilter;
@@ -133,14 +132,7 @@ public class AppContextListener {
         } else if (event instanceof ContextClosedEvent) {
 
             arduinoService.close();
-
-            for (MetricsSource ms : epeverService.metricSourceList) {
-                try {
-                    ms.charger.disconnect();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
+            epeverService.close();
 
         } else if (event instanceof ContextRefreshedEvent) {
 

@@ -7,15 +7,13 @@
     <groupId>com.xmonit.solar</groupId>
     <artifactId>solar-web-service</artifactId>
     <packaging>jar</packaging>
-    <version>${revision}</version>
-
+    <version>1.2.3-SNAPSHOT</version>
 
     <properties>
         <java.version>1.8</java.version>
         <junit.version>4.12</junit.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <revision>1.2.1-RELEASE</revision>
     </properties>
 
     <parent>
@@ -91,12 +89,12 @@
         <dependency>
             <groupId>com.xmonit.solar</groupId>
             <artifactId>arduino-solar-serialbus</artifactId>
-            <version>${revision}</version>
+            <version>1.2.3-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.xmonit.solar</groupId>
             <artifactId>epever-solar-modbus</artifactId>
-            <version>${revision}</version>
+            <version>1.2.3-SNAPSHOT</version>
         </dependency>
 
 <!--
