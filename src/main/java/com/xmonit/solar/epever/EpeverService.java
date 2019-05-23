@@ -18,6 +18,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Function;
@@ -34,30 +35,27 @@ public class EpeverService {
     public List<MetricsSource> metricSourceList = new LinkedList();
     AppConfig conf;
     MeterRegistry meterRegistry;
-    private MetricsWatchdog metricsWatchdog = new MetricsWatchdog<EpeverSolarCharger>("EPEVER"){
+    protected MetricsWatchdog metricsWatchdog = new MetricsWatchdog<EpeverSolarCharger>("EPEVER"){
         @Override
         public synchronized void attemptRecover(){
-            /*EpeverSolarCharger charger = getMetricsSource();
-            if (charger != null ) {
-                try {
-                    log.warn("Attempting disconnect: " + charger.getId());
-                    getMetricsSource().disconnectNow();
-                    log.warn("Attempting connect: " + charger.getId());
-                    getMetricsSource().connect();
-                    log.info("Connected: " + charger.getId());
-                } catch (ModbusIOException e) {
-                    log.error("Failed reseting charger connection.", e);
-                }
-            } else {
-                log.warn("No metrics source found for current step so cannot close the charger connection.");
-            }
-            */
             log.info("Attempting to restart service from " + getName() + " watchdog");
             ProcessBuilder processBuilder = new ProcessBuilder();
-            processBuilder.command("bash", "-c", "sudo", "/bin/systemctl", "restart", "solar-web");
+            // Add via visudo: xmonit ALL=NOPASSWD:/bin/systemctl restart solar-web
+            processBuilder.redirectErrorStream(true).command("bash", "-c", "sudo /bin/systemctl restart solar-web");
             try {
                 Process process = processBuilder.start();
-                //int exitVal = process.waitFor(); //TBD - okay without wait???
+                log.info("Launched: " + String.join(" ",processBuilder.command()) );
+                try (InputStream in = process.getInputStream();) {
+                    byte[] bytes = new byte[2048];
+                    int len;
+                    while ((len = in.read(bytes)) != -1) {
+                        System.out.write(bytes, 0, len);
+                    }
+                }
+                if ( !process.isAlive() ) {
+                    // should not get here since process shutdown usually takes a minute while OS decides to kill unresponsive service
+                    log.error("Exit code: " + process.exitValue() );
+                }
             } catch (Exception e) {
                 log.error("Failed restarting service from " + getName() + " watchdog",e);
             }
