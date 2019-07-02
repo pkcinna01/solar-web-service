@@ -75,13 +75,22 @@ public class ArduinoController extends AsyncTaskRunner {
 
     @GetMapping(value="metrics/{arduinoId}", produces="application/json")
     @ResponseBody
-    public Collection<ArduinoMetric> metrics(@PathVariable(value = "arduinoId", required = true) Integer arduinoId ) throws Exception {
+    public Collection<ArduinoMetric> metrics(@PathVariable(value = "arduinoId", required = true) Integer arduinoId,
+                                             @RequestParam(name = "sensorName", required = false) String sensorName,
+                                             @RequestParam(name = "sensorId", required = false) Integer sensorId) throws Exception {
 
         Collection<Sensor> sensors = arduinoService.getCachedMetrics(arduinoId);
         if ( sensors == null ) {
             return Collections.emptyList();
         } else {
-            return sensors.stream().map(
+            return sensors.stream().filter( sensor -> {
+                if (sensorId != null)
+                    return sensor.id == sensorId;
+                else if ( sensorName != null )
+                    return sensor.name.matches(sensorName);
+                else
+                    return true;
+            } ).map(
                     sensor -> new ArduinoMetric(sensor.id, sensor.name, sensor.getValue(), sensor.type)).collect(Collectors.toList()
             );
         }
