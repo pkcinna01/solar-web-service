@@ -1,15 +1,14 @@
 package com.xmonit.solar;
 
 import com.xmonit.solar.arduino.ArduinoService;
-import com.xmonit.solar.arduino.SerialCmd;
 import com.xmonit.solar.arduino.dao.Dao;
-import com.xmonit.solar.arduino.dao.annotation.*;
+import com.xmonit.solar.arduino.dao.annotation.AccessorHelper;
+import com.xmonit.solar.arduino.dao.annotation.ArduinoDao;
 import com.xmonit.solar.epever.EpeverService;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.config.MeterFilter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCustomizer;
@@ -100,27 +99,9 @@ public class AppContextListener {
                     ArduinoDao daoAnnotation = daoClass.getAnnotation(ArduinoDao.class);
                     List<Dao.FieldMetaData> fields = new ArrayList<>();
                     for (Method method : daoClass.getMethods()) {
-                        Class rtnClass = method.getReturnType();
-                        if (SerialCmd.FieldAccessor.class.isAssignableFrom(rtnClass)) {
-                            Class[] accessorTypes = {IntegerAccessor.class, DoubleAccessor.class,StringAccessor.class,BooleanAccessor.class,ChoiceAccessor.class,ConstraintAccessor.class};
-                            for( Class accessorType : accessorTypes) {
-                                Object fieldAccessor = method.getAnnotation(accessorType);
-                                if ( fieldAccessor != null ) {
-                                    Class fac = fieldAccessor.getClass();
-                                    Method m = fac.getMethod("validationRegEx");
-                                    String validationRegEx = (String) m.invoke(fieldAccessor);
-                                    m = fac.getMethod("value");
-                                    String value = (String) m.invoke(fieldAccessor);
-                                    m = fac.getMethod("readOnly");
-                                    boolean readOnly = (boolean) m.invoke(fieldAccessor);
-                                    String type = accessorType.getSimpleName().replaceAll("Accessor$","");
-                                    if (StringUtils.isEmpty(value)) {
-                                        value = method.getName();
-                                    }
-                                    fields.add(new Dao.FieldMetaData(value, type, readOnly, validationRegEx));
-                                    break;
-                                }
-                            }
+                        Dao.FieldMetaData metaData = AccessorHelper.getFieldMetaData(method);
+                        if ( metaData != null ) {
+                            fields.add(metaData);
                         }
                     }
                     Dao.metaDataDictionary.put(daoClass.getSimpleName().replaceAll("Dao$",""),fields);

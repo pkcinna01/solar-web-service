@@ -39,9 +39,10 @@ abstract public class DomainDaoController<DataT, DaoT extends DomainDao> extends
 	*/
 
 	@GetMapping(value = "list/{arduinoId}", produces = "application/json")
-	@Cacheable(cacheNames = "domainList", key = "{#root.targetClass, #id}")
-	public DataT[] list(@PathVariable Integer arduinoId) throws ArduinoException {
-		return createDao(getBusById(arduinoId)).list();
+	@Cacheable(cacheNames = "domainList", key = "{#root.targetClass, #arduinoId, #verbose}")
+	public DataT[] list(@PathVariable Integer arduinoId,
+						@RequestParam(required = false, defaultValue = "true") boolean verbose) throws ArduinoException {
+		return createDao(getBusById(arduinoId)).list(verbose);
 	}
 
 	@GetMapping(value = "get/{arduinoId}/{id}", produces = "application/json")
@@ -52,10 +53,10 @@ abstract public class DomainDaoController<DataT, DaoT extends DomainDao> extends
 	}
 
 	@GetMapping(value = { "list", "" }, produces = "application/json")
-	@Cacheable(cacheNames = "domainList", key = "#root.targetClass")
-	public List<TaskResult<DataT[]>> listAll() throws ArduinoException {
+	@Cacheable(cacheNames = "domainList", key = "{#root.targetClass, #verbose}")
+	public List<TaskResult<DataT[]>> listAll(@RequestParam(required = false, defaultValue = "true") boolean verbose) throws ArduinoException {
 		AsyncTask<DataT[]> task = (bus) -> {
-			return new TaskResult<DataT[]>(bus.name, bus.id, list(bus.id));
+			return new TaskResult<DataT[]>(bus.name, bus.id, list(bus.id,verbose));
 		};
 		return process(getBuses(), task);
 	}

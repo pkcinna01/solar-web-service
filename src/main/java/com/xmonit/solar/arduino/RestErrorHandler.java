@@ -12,7 +12,7 @@ import javax.servlet.http.HttpServletRequest;
 public class RestErrorHandler {
 
 	@ExceptionHandler(ArduinoException.class)
-	ResponseEntity<Status> handleArduinioException(HttpServletRequest req, ArduinoException ex) {
+	ResponseEntity<Status> handleArduinoException(HttpServletRequest req, ArduinoException ex) {
 		Status status = new Status();
 		status.msg = ex.getMessage();
 		status.code = ex.reasonCode.orElse(-1);

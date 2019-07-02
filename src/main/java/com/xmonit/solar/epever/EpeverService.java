@@ -152,6 +152,12 @@ public class EpeverService {
                         }
                         log.error("Failed updating monitoring statistics.", ex);
                         ms.invalidate(ex);
+                        try {
+                            log.info("Reconnecting solar charger " + ms.charger.getId());
+                            ms.charger.reconnect();
+                        } catch ( Exception e ) {
+                            log.warn(e.getMessage());
+                        }
                     } else {
                         try {
                             Thread.sleep(1500);
@@ -175,7 +181,7 @@ public class EpeverService {
      * Put daily summary in log
      */
     @Timed
-    @Scheduled(cron = "0 0 0 1/1 * ?")
+    @Scheduled(cron = "5 0 0 1/1 * ?")
     private void dailySummary() {
         for (MetricsSource ms : metricSourceList) {
             ms.metrics.updateStatsTracker.logReliabiltyInfo();
@@ -187,7 +193,6 @@ public class EpeverService {
     protected synchronized void init() throws SerialPortException {
 
         log.info("Initializing EPEVER controllers");
-
         switch (conf.getEpeverSerialImpl().toLowerCase()) {
             case "jserialcomm":
             case "jsc":
@@ -215,8 +220,10 @@ public class EpeverService {
             MetricsSource ms = new MetricsSource(meterRegistry);
             try {
                 ms.charger.init(serialName);
+                ms.charger.maxConnectionAgeMs = conf.epeverMaxConnectionAgeMs;
                 log.info(serialName + " charge controller intialized");
-                ms.charger.withConnection(() -> log.info(ms.charger.getDeviceInfo().toString()));
+                ms.charger.connect();
+                log.info(ms.charger.getDeviceInfo().toString());
                 ms.init(conf);
                 metricSourceList.add(ms);
             } catch (Exception e) {

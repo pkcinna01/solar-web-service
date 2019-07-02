@@ -46,6 +46,9 @@ public class AppConfig implements ArduinoConfig, EpeverConfig {
     @Value("${epever.monitoring.expiredMetricMs:60000}")
     public Integer epeverExpiredMetricMs;
 
+    @Value("${epever.connection.maxAgeMs:3600000}")
+    public Long epeverMaxConnectionAgeMs;
+
     @Value("${http.remoteHostRegEx}")
     public String remoteHostRegEx;
 
