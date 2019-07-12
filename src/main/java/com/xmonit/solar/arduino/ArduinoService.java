@@ -163,7 +163,9 @@ public class ArduinoService {
 	// block getCachedMetrics if a sensor state changed and needs correct value (openhab power switches)
 	protected void refreshMetrics() {
 		synchronized ( metricsRefresh ) {
+		    logger.info("Metrics refresh started");
 			updateMonitoringMetrics();
+            logger.info("Metrics refresh finished");
 		}
 	}
 
