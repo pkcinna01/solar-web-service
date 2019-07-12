@@ -158,7 +158,18 @@ public class ArduinoService {
 		}
 	}
 
+	private Object metricsRefresh = new Object();
+
+	// block getCachedMetrics if a sensor state changed and needs correct value (openhab power switches)
+	protected void refreshMetrics() {
+		synchronized ( metricsRefresh ) {
+			updateMonitoringMetrics();
+		}
+	}
+
 	public Collection<Sensor> getCachedMetrics(Integer arduinoId) {
-		return metricsList.stream().filter( metrics -> metrics.arduinoId == arduinoId ).findAny().get().getSensors();
+		synchronized( metricsRefresh ) {
+			return metricsList.stream().filter(metrics -> metrics.arduinoId == arduinoId).findAny().get().getSensors();
+		}
 	}
 }
