@@ -160,9 +160,14 @@ public class ArduinoService {
 
 	private Object metricsRefresh = new Object();
 
-	// block getCachedMetrics if a sensor state changed and needs correct value (openhab power switches)
-	protected void refreshMetrics() {
+	public static interface MetricsStateChanger {
+		public void run() throws ArduinoException;
+	}
+
+	// block getCachedMetrics if a sensor state could change due to setting some value (openhab power switches)
+	protected void refreshMetrics( MetricsStateChanger metricsStateChanger) throws ArduinoException {
 		synchronized ( metricsRefresh ) {
+			metricsStateChanger.run();
 		    logger.info("Metrics refresh started");
 			updateMonitoringMetrics();
             logger.info("Metrics refresh finished");

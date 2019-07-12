@@ -22,8 +22,7 @@ public class PowerSwitchController extends DeviceController {
     @PutMapping(value = "on/{arduinoId}/{id}/{on}", produces = "application/json")
     public PowerSwitch setOn(@PathVariable Integer arduinoId, @PathVariable Integer id, @PathVariable boolean on,
                              @RequestParam(required = false, defaultValue = "false") Boolean persist) throws ArduinoException {
-        new PowerSwitchDao(getBusById(arduinoId)).on(id).set(on).saveIf(persist,on);
-        arduinoService.refreshMetrics();
+        arduinoService.refreshMetrics(() -> { new PowerSwitchDao(getBusById(arduinoId)).on(id).set(on).saveIf(persist,on);} );
         return (PowerSwitch) getById(arduinoId, id, false);
     }
 
