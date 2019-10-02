@@ -2,10 +2,9 @@
 
 ## Synopsis
 
-Application for Off Grid Solar System using EPEver Charge Controllers.  
-1) Queries and updates an Arduino via USB.  The Arduino manages fans and temperatures.
-It Also monitors power usage and voltages.
-2) Queries and updates EPEver Charge Controllers via USB using modbus protocol.
+Application for Off Grid Solar System managing misc hardware via USB cables.  
+1. Arduino ATMEGA2560 for managing fans, sensors, and power switches.
+2. EPEver charge controllers using modbus protocol for monitoring and configuring.
 
 From a high level, it is the backend service layer for the 
 [solar-web-client](https://github.com/pkcinna01/solar-web-client) web interface.  It uses the 
@@ -17,33 +16,10 @@ java jar files to communicate with the devices connected with USB cables.
 This is a Spring Boot web application that runs as a service on Linux on port 9202 by default.
 It uses the Spring Actuator API to expose arduino data in Prometheus and Grafana.
 
-
-**TO DO:**
-
-1. Add a Docker compose project to run Prometheus,
-Grafana, Java, Maven, Nginx, etc...
-
-## Examples
-
-**Get arduino metrics as JSON using cURL**
-
-[(see arduino-solar-serialbus for url syntax)](https://github.com/pkcinna01/arduino-solar-serialbus) 
-```
-# View arduino status and configuration
-curl -X POST http://localhost:9202/arduino/execute
-```
-
-**View supported commands:**
-```
-pkcinna@jax1:/opt/prometheus/bin$ curl -X POST http://localhost:9202/arduino/help
-```
-
 ## Motivation
 
-This project manages fans for cooling epever solar charge controllers 
-and the structure they are housed in.  It provides hooks for external applications
-to manage fans and temperatures or let the Arduino app do it.
-  
+Provides a bridge between solar equiment, Prometheus/Graphana, OpenHAB, and misc services that manage available power going to home appliances (primarily cheap low power HVAC equiment).
+[Grafana example](https://snapshot.raintank.io/dashboard/snapshot/EAR5W7iO009fUdixSgTiXrLFSIlaiozB?orgId=2&kiosk)
 
 ## Installation
 
