@@ -19,7 +19,7 @@ It uses the Spring Actuator API to expose arduino data in Prometheus and Grafana
 ## Motivation
 
 Provides a bridge between solar equiment, Prometheus/Graphana, OpenHAB, and misc services that manage available power going to home appliances (primarily cheap low power HVAC equiment).
-[Grafana example](https://snapshot.raintank.io/dashboard/snapshot/6YHsPgFYxvp151Y8IUNhhPw53w9bYj8y?orgId=2&kiosk)
+[Grafana example](https://snapshot.raintank.io/dashboard/snapshot/EAR5W7iO009fUdixSgTiXrLFSIlaiozB?orgId=2&kiosk)
 
 ## Installation
 
